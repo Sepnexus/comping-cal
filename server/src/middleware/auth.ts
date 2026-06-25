@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { verifyLocationToken, verifyLaunchPassword } from '../util/crypto.js';
 import { locations, type LocationRow } from '../db/repos.js';
+import { fetchLocationName } from '../adapters/ghl.js';
 
 console.log(`  Location onboarding: ${config.autoProvision ? 'auto-provision (TOFU)' : 'strict allowlist'}`);
 
@@ -21,7 +22,7 @@ declare global {
  * locationId) AND that the location is present + active in the allowlist. On any
  * failure we return a neutral message — never leak which check failed (§7.6).
  */
-export function requireLocation(req: Request, res: Response, next: NextFunction): void {
+export async function requireLocation(req: Request, res: Response, next: NextFunction): Promise<void> {
   const ghlLocationId: string = req.body?.locationId ?? req.query?.locationId;
   const token: string = req.body?.token ?? req.query?.token;
   const neutral = (): void => {
@@ -37,9 +38,17 @@ export function requireLocation(req: Request, res: Response, next: NextFunction)
   let loc = locations.byGhlId(ghlLocationId);
   if (!loc) {
     if (!config.autoProvision) return neutral(); // strict allowlist — don't reveal why
-    // First contact from a new sub-account → register it (active, unnamed) and track.
-    loc = locations.insert({ ghl_location_id: ghlLocationId, name: '' });
-    console.log(`  ✚ auto-provisioned location ${ghlLocationId} (${loc.id})`);
+    // First contact from a new sub-account → authorize it against the agency's GHL
+    // backend. A returned name means the app is installed for this location (OAuth on
+    // file) → provision it under that name. An explicit "no" means the link is from a
+    // location that isn't entitled → reject. (No endpoint configured → provision unnamed.)
+    const resolved = await fetchLocationName(ghlLocationId);
+    if (resolved === null) {
+      res.status(403).json({ ok: false, error: 'not_authorized', message: 'This location isn’t authorized to use the comping tool. Please contact your administrator.' });
+      return;
+    }
+    loc = locations.insert({ ghl_location_id: ghlLocationId, name: resolved ?? '' });
+    console.log(`  ✚ provisioned location ${ghlLocationId} (${loc.id})${resolved ? ` as “${resolved}”` : ' (unnamed)'}`);
   }
   if (loc.status === 'suspended' || loc.status === 'inactive') {
     res.status(403).json({ ok: false, error: 'inactive', message: 'This location is not active.' });

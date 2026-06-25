@@ -25,15 +25,15 @@ export function VerifyingCard() {
   );
 }
 
-export function AccessDeniedCard() {
+export function AccessDeniedCard({ title, message }: { title?: string; message?: string } = {}) {
   return (
     <div style={{ ...card, maxWidth: 460, margin: '50px auto', padding: 34, textAlign: 'center', animation: 'scaleIn .35s ease both' }}>
       <div style={{ width: 56, height: 56, borderRadius: 15, background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
         <Icon path={ic.lock} size={26} stroke="var(--text2)" />
       </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>This link isn't valid</h2>
+      <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>{title ?? "This link isn't valid"}</h2>
       <p style={{ margin: '0 auto', maxWidth: 340, color: 'var(--text2)', fontSize: 14 }}>
-        Open the comping tool from the property button on a GoHighLevel contact. If this keeps happening, contact your account admin.
+        {message ?? 'Open the comping tool from the property button on a GoHighLevel contact. If this keeps happening, contact your account admin.'}
       </p>
     </div>
   );

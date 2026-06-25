@@ -34,6 +34,7 @@ export const config = {
     mode: (process.env.GHL_MODE ?? 'mock') as 'mock' | 'live',
     // Endpoints supplied by Closer Control / their GHL+KNL backend:
     contactUrl: process.env.GHL_CONTACT_URL ?? '', // GET contact (name, address, …) by contactId
+    locationUrl: process.env.GHL_LOCATION_URL ?? '', // GET location name by locationId → authorization gate
     chargeUrl: process.env.GHL_CHARGE_URL ?? '', //   POST per-comp charge → {status, reason}
     writebackUrl: process.env.GHL_WRITEBACK_URL ?? '', // POST values back to the contact
     apiKey: process.env.GHL_API_KEY ?? '', //         auth for the three endpoints above

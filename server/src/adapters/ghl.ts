@@ -77,6 +77,37 @@ export async function fetchContact(ghlLocationId: string, contactId: string): Pr
   };
 }
 
+// ── Location authorization (name lookup) ─────────────────────────────────────
+/**
+ * Resolve a location's display name from the agency's GHL backend (n8n webhook),
+ * keyed by `locationId`. This doubles as the authorization gate: only locations
+ * the backend recognises (app installed → OAuth on file) return a name.
+ *   • a non-empty name  → authorized; we provision the location under that name
+ *   • null              → explicitly NOT authorized (endpoint answered "no")
+ *   • undefined         → no opinion (endpoint not configured or transient error)
+ *                          → caller falls back to legacy behaviour (provision unnamed)
+ */
+export async function fetchLocationName(ghlLocationId: string): Promise<string | null | undefined> {
+  const endpoint = settings.ghlLocationUrl();
+  if (endpoint) {
+    try {
+      const url = new URL(endpoint);
+      url.searchParams.set('locationId', ghlLocationId);
+      const res = await fetch(url, { method: 'GET', headers: authHeaders() });
+      if (res.status !== 200) return null; // 404/4xx → not a known/authorized location
+      const body: any = await res.json().catch(() => ({}));
+      const name = body?.name ?? body?.location?.name ?? body?.locationName ?? body?.data?.name;
+      return typeof name === 'string' && name.trim() ? name.trim() : null;
+    } catch {
+      return undefined; // network/transient → don't lock the user out
+    }
+  }
+  // No endpoint configured → dev/mock fallback. Lets local testing exercise the deny
+  // path (ids containing "unauth"/"deny") without standing up the real webhook.
+  if (/unauth|deny|notfound/i.test(ghlLocationId)) return null;
+  return undefined;
+}
+
 // ── Per-comp charge ──────────────────────────────────────────────────────────
 export type WalletChargeResult =
   | { ok: true; transactionId?: string }

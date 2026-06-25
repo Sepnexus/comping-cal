@@ -42,6 +42,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
   const [contactName, setContactName] = useState('…');
   const [ready, setReady] = useState(false); // launch context established?
   const [billingReason, setBillingReason] = useState<string | null>(null);
+  const [accessInfo, setAccessInfo] = useState<{ title: string; message: string } | null>(null);
   const runningCount = useRef(14);
   // Real launch (GHL button / SSO) carries the location in the URL → fixed context,
   // no switcher. Only the dev bootstrap (bare localhost) gets the location picker.
@@ -113,7 +114,13 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
       }
       setWs('confirm');
     } catch (err: any) {
-      // suspended/inactive location → 403; bad token/allowlist → 401 (FRD §7.6)
+      // not authorized (location not entitled) → show the server's reason; otherwise
+      // suspended/inactive → 403, bad token/allowlist → 401 (FRD §7.6) → neutral copy.
+      if (err?.body?.error === 'not_authorized') {
+        setAccessInfo({ title: 'Location not authorized', message: err.body.message ?? 'This location isn’t authorized to use the comping tool.' });
+      } else {
+        setAccessInfo(null);
+      }
       setWs('accessDenied');
     }
   }, []);
@@ -208,7 +215,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
     <Shell screen="workspace" contactName={contactName} locName={locName} onSwitchLocation={bootstrap} onRenameLocation={renameLocation} allowSwitch={!launchedViaUrl}>
       <div style={{ maxWidth: ws === 'result' ? 1180 : 1180, margin: '0 auto', padding: '26px 28px 60px' }}>
         {ws === 'verifying' && <VerifyingCard />}
-        {ws === 'accessDenied' && <AccessDeniedCard />}
+        {ws === 'accessDenied' && <AccessDeniedCard title={accessInfo?.title} message={accessInfo?.message} />}
         {ws === 'billingIssue' && <BillingIssueCard reason={billingReason} onViewSaved={() => (window.location.href = '/history')} />}
         {ws === 'error' && (
           <ErrorCard

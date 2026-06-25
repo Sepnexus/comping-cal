@@ -20,6 +20,7 @@ const STR = {
   brickedApiKey: 'bricked_api_key',
   ghlMode: 'ghl_mode',
   ghlContactUrl: 'ghl_contact_url',
+  ghlLocationUrl: 'ghl_location_url',
   ghlChargeUrl: 'ghl_charge_url',
   ghlWritebackUrl: 'ghl_writeback_url',
   ghlApiKey: 'ghl_api_key',
@@ -53,6 +54,7 @@ export const settings = {
   brickedApiKey: () => readStr(STR.brickedApiKey, config.bricked.apiKey),
   ghlMode: () => readStr(STR.ghlMode, config.ghl.mode) as 'mock' | 'live',
   ghlContactUrl: () => readStr(STR.ghlContactUrl, config.ghl.contactUrl),
+  ghlLocationUrl: () => readStr(STR.ghlLocationUrl, config.ghl.locationUrl),
   ghlChargeUrl: () => readStr(STR.ghlChargeUrl, config.ghl.chargeUrl),
   ghlWritebackUrl: () => readStr(STR.ghlWritebackUrl, config.ghl.writebackUrl),
   ghlApiKey: () => readStr(STR.ghlApiKey, config.ghl.apiKey),
@@ -91,6 +93,7 @@ export const settings = {
     brickedApiKey?: string;
     ghlMode?: string;
     ghlContactUrl?: string;
+    ghlLocationUrl?: string;
     ghlChargeUrl?: string;
     ghlWritebackUrl?: string;
     ghlApiKey?: string;
@@ -106,6 +109,7 @@ export const settings = {
       if (patch.brickedMode === 'mock' || patch.brickedMode === 'live') upsert.run(STR.brickedMode, patch.brickedMode);
       if (patch.ghlMode === 'mock' || patch.ghlMode === 'live') upsert.run(STR.ghlMode, patch.ghlMode);
       setIf(STR.ghlContactUrl, patch.ghlContactUrl);
+      setIf(STR.ghlLocationUrl, patch.ghlLocationUrl);
       setIf(STR.ghlChargeUrl, patch.ghlChargeUrl);
       setIf(STR.ghlWritebackUrl, patch.ghlWritebackUrl);
       setIf(STR.launchPassword, patch.launchPassword);

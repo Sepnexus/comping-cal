@@ -159,4 +159,6 @@ export const adminApi = {
   pnl: () => adminGet('/pnl'),
   settings: () => adminGet('/settings'),
   updateSettings: (patch: Record<string, string | number>) => adminSend('/settings', 'PATCH', patch),
+  purge: (): Promise<{ ok: true; removed: { locationsDeleted: number; snapshots: number; usageEvents: number; writebacks: number } }> =>
+    adminSend('/purge', 'POST', { confirm: 'RESET' }),
 };

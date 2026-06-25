@@ -246,6 +246,7 @@ function settingsPayload() {
     // ghl
     ghlMode: settings.ghlMode(),
     ghlContactUrl: settings.ghlContactUrl(),
+    ghlLocationUrl: settings.ghlLocationUrl(),
     ghlChargeUrl: settings.ghlChargeUrl(),
     ghlWritebackUrl: settings.ghlWritebackUrl(),
     ghlKeySet: !!ghlKey,
@@ -259,6 +260,40 @@ function settingsPayload() {
 
 adminRouter.get('/settings', requireAdmin, (_req, res) => {
   res.json({ ok: true, settings: settingsPayload() });
+});
+
+/**
+ * POST /admin/purge — danger zone. Wipe all operational data (every non-test
+ * location, all snapshots, the whole usage/charge log and write-backs) while
+ * keeping the Sandbox test location, admin accounts and settings/integration
+ * keys. Requires { confirm: "RESET" } so it can't fire by accident.
+ */
+const TEST_LOCATION_GHL_ID = 'loc_test01';
+adminRouter.post('/purge', requireAdmin, (req, res) => {
+  if (req.body?.confirm !== 'RESET') {
+    res.status(422).json({ ok: false, error: 'confirm_required', message: 'Send { confirm: "RESET" } to wipe data.' });
+    return;
+  }
+  const n = (sql: string, ...p: unknown[]) => (db.prepare(sql).get(...p) as any).c as number;
+  const before = {
+    locations: n('SELECT COUNT(*) c FROM location'),
+    snapshots: n('SELECT COUNT(*) c FROM property_snapshot'),
+    usageEvents: n('SELECT COUNT(*) c FROM usage_event'),
+    writebacks: n('SELECT COUNT(*) c FROM writeback_log'),
+  };
+  db.transaction(() => {
+    db.prepare('DELETE FROM usage_event').run();
+    db.prepare('DELETE FROM writeback_log').run();
+    db.prepare('DELETE FROM property_snapshot').run();
+    db.prepare('DELETE FROM location WHERE ghl_location_id != ?').run(TEST_LOCATION_GHL_ID);
+  })();
+  const remaining = {
+    locations: n('SELECT COUNT(*) c FROM location'),
+    snapshots: n('SELECT COUNT(*) c FROM property_snapshot'),
+    usageEvents: n('SELECT COUNT(*) c FROM usage_event'),
+  };
+  console.log(`  ⚠︎ admin purge by ${req.admin?.email}: removed ${before.locations - remaining.locations} locations, ${before.snapshots} snapshots, ${before.usageEvents} usage events`);
+  res.json({ ok: true, removed: { locationsDeleted: before.locations - remaining.locations, snapshots: before.snapshots, usageEvents: before.usageEvents, writebacks: before.writebacks }, kept: { locations: remaining.locations, settings: true, admins: true } });
 });
 
 adminRouter.patch('/settings', requireAdmin, (req, res) => {
@@ -284,6 +319,7 @@ adminRouter.patch('/settings', requireAdmin, (req, res) => {
     brickedApiKey: body.brickedApiKey,
     ghlMode: body.ghlMode,
     ghlContactUrl: body.ghlContactUrl,
+    ghlLocationUrl: body.ghlLocationUrl,
     ghlChargeUrl: body.ghlChargeUrl,
     ghlWritebackUrl: body.ghlWritebackUrl,
     ghlApiKey: body.ghlApiKey,
