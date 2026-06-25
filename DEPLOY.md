@@ -14,7 +14,7 @@ certresolver `mytlschallenge` (same setup as your other apps).
 Point a subdomain at the VPS IP (`93.127.194.153`):
 
 ```
-comps.sepnexus.com   A   93.127.194.153
+comps.srv844822.hstgr.cloud   A   93.127.194.153
 ```
 
 (Use any host you like — just match `PUBLIC_HOST` in Step 3.)
@@ -85,10 +85,10 @@ First build ~2–4 min. You should see:
 Wait ~30s for Traefik to issue the SSL cert, then:
 
 ```bash
-curl -I https://comps.sepnexus.com/api/health     # → HTTP/2 200
+curl -I https://comps.srv844822.hstgr.cloud/api/health     # → HTTP/2 200
 ```
 
-Open **https://comps.sepnexus.com/admin/login** and sign in with your admin creds.
+Open **https://comps.srv844822.hstgr.cloud/admin/login** and sign in with your admin creds.
 
 ---
 
@@ -97,7 +97,7 @@ Open **https://comps.sepnexus.com/admin/login** and sign in with your admin cred
 Edit [`integrations/ghl-comp-button.js`](integrations/ghl-comp-button.js), set:
 
 ```js
-var TOOL_URL = 'https://comps.sepnexus.com';
+var TOOL_URL = 'https://comps.srv844822.hstgr.cloud';
 var LAUNCH_PASSWORD = '<the same LAUNCH_PASSWORD from .env>';
 ```
 
@@ -132,7 +132,7 @@ docker inspect comping-cal --format '{{range $k,$v := .NetworkSettings.Networks}
 
 **SSL cert never appears** — confirm DNS resolves to the VPS:
 ```bash
-dig comps.sepnexus.com +short    # → 93.127.194.153
+dig comps.srv844822.hstgr.cloud +short    # → 93.127.194.153
 ```
 Wait ~60s for first issuance.
 
