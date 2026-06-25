@@ -8,13 +8,16 @@
  *
  * ── CONFIGURE THESE TWO LINES ────────────────────────────────────────────────
  *   TOOL_URL        — where the Comping tool is hosted (no trailing slash)
- *   LAUNCH_PASSWORD — the shared secret; must equal LAUNCH_PASSWORD on the server
+ *   LAUNCH_PASSWORD — the shared secret; must equal the Launch password in
+ *                     Admin → Settings on the server.
  * ============================================================================ */
 (function () {
-  var TOOL_URL = 'https://comps.yourdomain.com';
+  var TOOL_URL = 'https://comps.srv844822.hstgr.cloud';
   var LAUNCH_PASSWORD = 'REPLACE_WITH_LAUNCH_PASSWORD';
   var OPEN_MODE = 'tab'; // 'tab' = new tab · 'modal' = in-page iframe overlay
   var BUTTON_LABEL = 'Get ARV';
+
+  console.log('[cc-comp] button script loaded');
 
   // ── Parse the GHL URL: /location/<locationId>/contacts/detail/<contactId> ──
   function getLocationId() {
@@ -75,26 +78,24 @@
     else window.open(url, '_blank');
   }
 
-  // ── Inject the button next to the address (reuses the Zillow/Google row) ──
-  function ensureButton() {
-    var addressNode =
+  // ── Find the address field in BOTH layouts (edit = input, view = read-only text) ──
+  function findAddressContainer() {
+    var input =
       document.querySelector('input[name="contact.address1"]') ||
       document.querySelector('input[name*=".address1"]');
-    if (!addressNode) return;
+    if (input) return input.closest('.hr-form-item') || input.closest('div[id]') || input.parentElement;
 
-    var row = document.getElementById('property-search-buttons');
-    if (!row) {
-      // No shared row yet → create our own just above the address field.
-      var container = addressNode.closest('.hr-form-item') || addressNode.parentElement;
-      if (!container) return;
-      row = document.createElement('div');
-      row.id = 'property-search-buttons';
-      row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:nowrap';
-      container.insertAdjacentElement('beforebegin', row);
+    var labels = document.querySelectorAll('span.hr-form-item-label__text, label');
+    for (var i = 0; i < labels.length; i++) {
+      var t = (labels[i].textContent || '').trim().toLowerCase();
+      if (t === 'street address' || t.indexOf('street address') !== -1) {
+        return labels[i].closest('.hr-form-item') || labels[i].closest('div[id]') || labels[i].parentElement;
+      }
     }
+    return null;
+  }
 
-    if (document.getElementById('cc-comp-button')) return; // already added
-
+  function buildButton() {
     var btn = document.createElement('a');
     btn.id = 'cc-comp-button';
     btn.href = '#';
@@ -103,14 +104,31 @@
     btn.style.cssText =
       'display:inline-flex;align-items:center;gap:6px;white-space:nowrap;background:#4C7A3C;border-color:#4C7A3C;color:#fff';
     btn.addEventListener('click', openTool);
-
     var icon = document.createElement('span');
-    icon.textContent = '⚡'; // ⚡
+    icon.textContent = '⚡';
     icon.style.cssText = 'font-size:14px;line-height:1';
     btn.appendChild(icon);
     btn.appendChild(document.createTextNode(BUTTON_LABEL));
+    return btn;
+  }
 
-    row.appendChild(btn);
+  // ── Inject the button. Prefer the existing Zillow/Google row; otherwise make one. ──
+  function ensureButton() {
+    if (document.getElementById('cc-comp-button')) return; // already there
+
+    // Only show on a contact detail page (we need a contactId).
+    if (!getContactId()) return;
+
+    var row = document.getElementById('property-search-buttons');
+    if (!row) {
+      var container = findAddressContainer();
+      if (!container) return;
+      row = document.createElement('div');
+      row.id = 'property-search-buttons';
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:nowrap';
+      container.insertAdjacentElement('beforebegin', row);
+    }
+    row.appendChild(buildButton());
   }
 
   // GHL is a SPA → keep the button present across route/DOM changes.
