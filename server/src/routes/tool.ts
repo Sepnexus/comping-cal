@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { requireLocation } from '../middleware/auth.js';
 import { fetchContact, writeBackContact } from '../adapters/ghl.js';
-import { runComp, generateRepairs, toPublicSnapshot } from '../engine/comp.js';
+import { runComp, generateRepairs, toPublicSnapshot, arvFromComps } from '../engine/comp.js';
+import type { BrickedProperty } from '../adapters/bricked.js';
 import { computeOffer, STRATEGIES, type StrategyId } from '../engine/offer.js';
 import { locations, snapshots, usage, writebacks } from '../db/repos.js';
 import { normalizeAddress } from '../util/crypto.js';
@@ -149,6 +150,56 @@ toolRouter.get('/property/:id', requireLocation, (req, res) => {
   }
   // free read — logged as a non-billable view is optional; per §8.2 views create no usage_event
   res.json({ ok: true, snapshot: toPublicSnapshot(row) });
+});
+
+/**
+ * POST /comp/select — set which comps are included in the deal and recompute ARV
+ * from the selected set. Free (no Bricked call) — edits stored data only (R2).
+ */
+toolRouter.post('/comp/select', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const { snapshotId, selectedIds } = req.body ?? {};
+  const row = snapshotId ? snapshots.byId(String(snapshotId)) : undefined;
+  if (!row || row.location_id !== loc.id) {
+    res.status(404).json({ ok: false, error: 'not_found' });
+    return;
+  }
+  const ids: string[] = Array.isArray(selectedIds) ? selectedIds.map(String) : [];
+  const property = JSON.parse(row.raw_json) as BrickedProperty;
+  property.comps = property.comps.map((c) => ({ ...c, selected: ids.includes(c.id) }));
+  const arv = arvFromComps(property.comps);
+  property.arv = arv;
+  const updated = snapshots.updateJson(row.id, JSON.stringify(property), arv, property.cmv ?? null)!;
+  res.json({ ok: true, snapshot: toPublicSnapshot(updated) });
+});
+
+/**
+ * POST /offer/save — persist the chosen underwriting offer (strategy + inputs +
+ * computed price) onto the snapshot. Free — pure math the client already ran (R2).
+ * Pass offer:null to clear it.
+ */
+toolRouter.post('/offer/save', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const { snapshotId, offer } = req.body ?? {};
+  const row = snapshotId ? snapshots.byId(String(snapshotId)) : undefined;
+  if (!row || row.location_id !== loc.id) {
+    res.status(404).json({ ok: false, error: 'not_found' });
+    return;
+  }
+  const property = JSON.parse(row.raw_json) as BrickedProperty;
+  if (offer && typeof offer === 'object') {
+    property.savedOffer = {
+      strategy: String(offer.strategy ?? ''),
+      label: String(offer.label ?? ''),
+      price: Number(offer.price) || 0,
+      inputs: offer.inputs && typeof offer.inputs === 'object' ? offer.inputs : {},
+      savedAt: new Date().toISOString(),
+    };
+  } else {
+    property.savedOffer = null;
+  }
+  const updated = snapshots.updateJson(row.id, JSON.stringify(property), property.arv ?? null, property.cmv ?? null)!;
+  res.json({ ok: true, snapshot: toPublicSnapshot(updated) });
 });
 
 /** POST /offer — free MAO math on saved data (§6.3). */

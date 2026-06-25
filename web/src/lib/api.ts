@@ -3,6 +3,7 @@ import type {
   LaunchContext,
   OfferResult,
   PublicSnapshot,
+  SavedOffer,
   SessionInfo,
   StrategyId,
 } from './types';
@@ -92,6 +93,12 @@ export const toolApi = {
   },
   repairs(opts: { snapshotId: string; repairsText: string; images?: string }): Promise<{ ok: true; charged: boolean; snapshot: PublicSnapshot }> {
     return post('/repairs', opts);
+  },
+  selectComps(opts: { snapshotId: string; selectedIds: string[] }): Promise<{ ok: true; snapshot: PublicSnapshot }> {
+    return post('/comp/select', opts);
+  },
+  saveOffer(opts: { snapshotId: string; offer: SavedOffer | null }): Promise<{ ok: true; snapshot: PublicSnapshot }> {
+    return post('/offer/save', opts);
   },
   offer(opts: { snapshotId: string; strategy: StrategyId }): Promise<{ ok: true; result: OfferResult }> {
     return post('/offer', opts);

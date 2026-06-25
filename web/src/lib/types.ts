@@ -1,5 +1,12 @@
 // Mirrors the server's public payloads (server/src/adapters/bricked.ts + engine).
 
+export interface CompPriceEvent {
+  date: string;
+  status: string;
+  amount: number;
+  pricePerSqft: number | null;
+}
+
 export interface BrickedComp {
   id: string;
   address: string;
@@ -18,6 +25,35 @@ export interface BrickedComp {
   latitude: number | null;
   longitude: number | null;
   image: string | null;
+  images: string[];
+  pricePerSqft: number | null;
+  occupancy: string | null;
+  stories: number | null;
+  heatingType: string | null;
+  acType: string | null;
+  exteriorWallType: string | null;
+  garageType: string | null;
+  hoaPresent: string | null;
+  mlsStatus: string | null;
+  mlsNumber: string | null;
+  mlsName: string | null;
+  agentName: string | null;
+  daysOnMarket: number | null;
+  priceHistory: CompPriceEvent[];
+}
+
+export interface TaxYear {
+  year: number | null;
+  assessedValue: number | null;
+  taxAmount: number | null;
+}
+
+export interface SavedOffer {
+  strategy: string;
+  label: string;
+  price: number;
+  inputs: Record<string, number>;
+  savedAt: string;
 }
 
 export interface BrickedProperty {
@@ -33,29 +69,52 @@ export interface BrickedProperty {
     longitude: number | null;
     lastSalePrice: number | null;
     lastSaleDate: string | null;
-    landUse: string | null;
     occupancy: string | null;
-    apn: string | null;
+    stories: number | null;
+    basementType: string | null;
+    basementSquareFeet: number | null;
+    airConditioningType: string | null;
+    heatingType: string | null;
+    heatingFuelType: string | null;
+    hoaPresent: string | null;
+    hoaFee: number | null;
+    hoaFeeFrequency: string | null;
+    fireplaces: number | null;
+    exteriorWallType: string | null;
+    daysOnMarket: number | null;
+    marketStatus: string | null;
     legalDescription: string | null;
+    landUse: string | null;
+    apn: string | null;
+    propertyClass: string | null;
+    lotNumber: string | null;
+    block: string | null;
+    schoolDistrict: string | null;
+    subdivision: string | null;
+    countyName: string | null;
+    openMortgageBalance: number | null;
+    estimatedEquity: number | null;
+    purchaseMethod: string | null;
+    ltvRatio: number | null;
+    itvRatio: number | null;
     owner1: string | null;
     owner2: string | null;
     ownerType: string | null;
-    openMortgageBalance: number | null;
-    estimatedEquity: number | null;
+    ownerOccupancy: string | null;
     taxAmount: number | null;
   };
+  taxes: TaxYear[];
   comps: BrickedComp[];
   cmv: number | null;
   arv: number | null;
   rentEstimate: number | null;
   repairs: { label: string; cost: number }[];
   totalRepairCost: number;
-  renovationScore: number;
-  mortgages: { amount: number; rate: string; loan: string; recorded: string; lender: string }[];
-  saleHistory: { date: string; amount: number; method: string; seller: string; buyer: string }[];
+  renovationScore: number | null;
   images: string[];
   shareLink: string;
   dashboardLink: string;
+  savedOffer: SavedOffer | null;
 }
 
 export interface PublicSnapshot {

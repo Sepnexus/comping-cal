@@ -239,9 +239,11 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
           <ResultPanel
             snapshot={snapshot}
             contact={session?.contact ?? null}
+            locationName={locName}
             onRefresh={refresh}
             onRepairs={onRepairs}
             onWriteback={onWriteback}
+            onSnapshot={setSnapshot}
           />
         )}
       </div>

@@ -7,6 +7,13 @@ import { settings } from '../db/settings.js';
  * money. We store the full raw response (schema-drift tolerant).
  */
 
+export interface CompPriceEvent {
+  date: string;
+  status: string;
+  amount: number;
+  pricePerSqft: number | null;
+}
+
 export interface BrickedComp {
   id: string;
   address: string;
@@ -25,11 +32,33 @@ export interface BrickedComp {
   latitude: number | null;
   longitude: number | null;
   image: string | null; // best single photo for the card
+  images: string[]; // full photo set for the detail modal gallery
+  // Detail-modal extras (all optional — surfaced when Bricked provides them)
+  pricePerSqft: number | null;
+  occupancy: string | null;
+  stories: number | null;
+  heatingType: string | null;
+  acType: string | null;
+  exteriorWallType: string | null;
+  garageType: string | null;
+  hoaPresent: string | null;
+  mlsStatus: string | null;
+  mlsNumber: string | null;
+  mlsName: string | null;
+  agentName: string | null;
+  daysOnMarket: number | null;
+  priceHistory: CompPriceEvent[];
 }
 
 export interface BrickedRepair {
   label: string;
   cost: number;
+}
+
+export interface TaxYear {
+  year: number | null;
+  assessedValue: number | null;
+  taxAmount: number | null;
 }
 
 export interface BrickedProperty {
@@ -45,29 +74,65 @@ export interface BrickedProperty {
     longitude: number | null;
     lastSalePrice: number | null;
     lastSaleDate: string | null;
-    landUse: string | null;
+    // details
     occupancy: string | null;
-    apn: string | null;
+    stories: number | null;
+    basementType: string | null;
+    basementSquareFeet: number | null;
+    airConditioningType: string | null;
+    heatingType: string | null;
+    heatingFuelType: string | null;
+    hoaPresent: string | null;
+    hoaFee: number | null;
+    hoaFeeFrequency: string | null;
+    fireplaces: number | null;
+    exteriorWallType: string | null;
+    daysOnMarket: number | null;
+    marketStatus: string | null;
     legalDescription: string | null;
+    // land / location
+    landUse: string | null;
+    apn: string | null;
+    propertyClass: string | null;
+    lotNumber: string | null;
+    block: string | null;
+    schoolDistrict: string | null;
+    subdivision: string | null;
+    countyName: string | null;
+    // mortgage / debt
+    openMortgageBalance: number | null;
+    estimatedEquity: number | null;
+    purchaseMethod: string | null;
+    ltvRatio: number | null;
+    itvRatio: number | null;
+    // ownership
     owner1: string | null;
     owner2: string | null;
     ownerType: string | null;
-    openMortgageBalance: number | null;
-    estimatedEquity: number | null;
+    ownerOccupancy: string | null;
     taxAmount: number | null;
   };
+  taxes: TaxYear[];
   comps: BrickedComp[];
   cmv: number | null;
   arv: number | null;
   rentEstimate: number | null;
   repairs: BrickedRepair[];
   totalRepairCost: number;
-  renovationScore: number; // 0..1 confidence
-  mortgages: { amount: number; rate: string; loan: string; recorded: string; lender: string }[];
-  saleHistory: { date: string; amount: number; method: string; seller: string; buyer: string }[];
+  renovationScore: number | null; // 0..1 confidence, null when Bricked has no score
   images: string[];
   shareLink: string;
   dashboardLink: string;
+  /** Persisted underwriting offer (client-saved, free math). Null until chosen. */
+  savedOffer: SavedOffer | null;
+}
+
+export interface SavedOffer {
+  strategy: string;
+  label: string;
+  price: number;
+  inputs: Record<string, number>;
+  savedAt: string;
 }
 
 export interface CreatePropertyParams {
@@ -121,17 +186,45 @@ function mockProperty(params: CreatePropertyParams): BrickedProperty {
       longitude: -82.778087,
       lastSalePrice: 250000,
       lastSaleDate: '5/15/2026',
-      landUse: params.landUse ?? 'Single Family Residential',
       occupancy: 'Non-Owner Occupied',
-      apn: '14-29-15-77598-001-0030',
+      stories: 1,
+      basementType: 'None',
+      basementSquareFeet: null,
+      airConditioningType: 'Central',
+      heatingType: 'Forced Air',
+      heatingFuelType: 'Gas',
+      hoaPresent: 'No',
+      hoaFee: null,
+      hoaFeeFrequency: null,
+      fireplaces: 1,
+      exteriorWallType: 'Wood',
+      daysOnMarket: 34,
+      marketStatus: 'Off Market',
       legalDescription: 'RUSSELLS SUB BLK 1, LOT 3',
+      landUse: params.landUse ?? 'Single Family Residential',
+      apn: '14-29-15-77598-001-0030',
+      propertyClass: 'Residential',
+      lotNumber: '3',
+      block: '1',
+      schoolDistrict: 'Pinellas County School District',
+      subdivision: 'RUSSELLS SUB',
+      countyName: 'Pinellas',
+      openMortgageBalance: 297000,
+      estimatedEquity: -24000,
+      purchaseMethod: 'Financed',
+      ltvRatio: 0.88,
+      itvRatio: 0.81,
       owner1: 'JAE ENTERPRISES LLC',
       owner2: null,
       ownerType: 'CORPORATE',
-      openMortgageBalance: 297000,
-      estimatedEquity: -24000,
+      ownerOccupancy: 'Non-Owner Occupied',
       taxAmount: 4478,
     },
+    taxes: [
+      { year: 2025, assessedValue: 312000, taxAmount: 4478 },
+      { year: 2024, assessedValue: 298000, taxAmount: 4201 },
+      { year: 2023, assessedValue: 281000, taxAmount: 3998 },
+    ],
     comps: [
       mkComp('1', '111 Orangeview Ave, Clearwater, FL 33755-5229', 382000, '5/26/2026', 0.01, 3, 2, 1248, 0.2, 1950, true, 27.967217, -82.778086),
       mkComp('2', '119 N Hillcrest Ave, Clearwater, FL 33755-5143', 357000, '10/24/2025', 0.06, 2, 2, 1140, 0.2, 1951, true, 27.967636, -82.779104),
@@ -143,20 +236,11 @@ function mockProperty(params: CreatePropertyParams): BrickedProperty {
     rentEstimate: r2(2579),
     repairs,
     totalRepairCost,
-    renovationScore: hasRepairs ? 0.82 : 0.55,
-    mortgages: [
-      { amount: 297000, rate: '6.30%', loan: 'Conventional', recorded: '5/27/2026', lender: 'EASY STREET CAPITAL LLC' },
-      { amount: 57431, rate: '6.10%', loan: 'Conventional', recorded: '4/10/2007', lender: 'BENEFICIAL FLORIDA INC' },
-      { amount: 19000, rate: '7.93%', loan: 'Fixed Rate', recorded: '11/9/2000', lender: '1ST UNION NATL BK' },
-    ],
-    saleHistory: [
-      { date: '5/15/2026', amount: 250000, method: 'Financed', seller: 'REVIVE TAMPA BAY LLC', buyer: 'JAE ENTERPRISES LLC' },
-      { date: '5/15/2026', amount: 174000, method: 'Cash', seller: 'KELLY SCHUTT / MARIE LISA', buyer: 'REVIVE TAMPA BAY LLC' },
-      { date: 'Invalid Date', amount: 19000, method: 'Financed', seller: 'N/A', buyer: 'SCHUTT ROBERT KELLY' },
-    ],
+    renovationScore: hasRepairs ? 0.82 : null,
     images: [], // mock has no real imagery → aerial shows the styled placeholder
     shareLink: `https://app.bricked.ai/share/${id}`,
     dashboardLink: `https://app.bricked.ai/dashboard/${id}`,
+    savedOffer: null,
   };
 }
 
@@ -193,6 +277,24 @@ function mkComp(
     latitude: lat,
     longitude: lng,
     image: null, // mock has no real photos → card shows the styled placeholder
+    images: [],
+    pricePerSqft: sqft ? Math.round((price / sqft) * 100) / 100 : null,
+    occupancy: 'Owner Occupied',
+    stories: 1,
+    heatingType: 'Forced Air',
+    acType: 'Central',
+    exteriorWallType: 'Wood',
+    garageType: 'Attached',
+    hoaPresent: 'No',
+    mlsStatus: 'Sold',
+    mlsNumber: 'MLS' + n + '00' + n,
+    mlsName: 'Stellar MLS',
+    agentName: 'Jane Agent',
+    daysOnMarket: 21,
+    priceHistory: [
+      { date, status: 'Sold', amount: price, pricePerSqft: sqft ? Math.round((price / sqft) * 100) / 100 : null },
+      { date, status: 'Pending', amount: Math.round(price * 1.02), pricePerSqft: null },
+    ],
   };
 }
 
@@ -301,28 +403,68 @@ export function mapLiveResponse(raw: any, requestedAddress: string): BrickedProp
   const totalRepairCost =
     raw.totalRepairCost != null ? Number(raw.totalRepairCost) : repairs.reduce((s, r) => s + r.cost, 0);
 
+  const acres = (sqft: number | null | undefined): number | null =>
+    sqft ? Math.round((sqft / 43560) * 100) / 100 : null;
+  const photos = (images: unknown): string[] =>
+    Array.isArray(images) ? images.filter((u): u is string => typeof u === 'string') : [];
+
   const comps: BrickedComp[] = (Array.isArray(raw.comps) ? raw.comps : []).map((c: any, i: number) => {
     const cd = c.details ?? {};
+    const m = c.mls ?? {};
+    const imgs = photos(c.images);
+    const history: CompPriceEvent[] = Array.isArray(m.historicListings)
+      ? m.historicListings.slice(0, 12).map((h: any) => ({
+          date: msToDate(h.listingDate) ?? '—',
+          status: h.status ?? '—',
+          amount: Number(h.amount) || 0,
+          pricePerSqft: h.pricePerSquareFoot != null ? Number(h.pricePerSquareFoot) : null,
+        }))
+      : [];
+    const sqft = Number(cd.squareFeet) || 0;
     return {
-      id: c.mls?.mlsNumber ?? `comp_${i}`,
+      id: m.mlsNumber ?? c.address?.fullAddress ?? `comp_${i}`,
       address: c.address?.fullAddress ?? '',
       adjusted_value: Number(c.adjusted_value) || 0,
-      sale_price: Number(cd.lastSaleAmount ?? c.mls?.amount ?? c.adjusted_value) || 0,
+      sale_price: Number(cd.lastSaleAmount ?? m.amount ?? c.adjusted_value) || 0,
       selected: !!c.selected,
       compType: c.compType ?? '',
-      source: c.listingType ?? c.mls?.status ?? 'comp',
+      source: c.listingType ?? m.status ?? 'comp',
       distance: haversineMiles(sLat, sLng, c.latitude, c.longitude),
-      sale_date: msToDate(cd.lastSaleDate ?? c.mls?.listingDate) ?? '',
+      sale_date: msToDate(cd.lastSaleDate ?? m.listingDate) ?? '',
       beds: Number(cd.bedrooms) || 0,
       baths: Number(cd.bathrooms) || 0,
-      squareFeet: Number(cd.squareFeet) || 0,
-      lotAcres: cd.lotSquareFeet ? Math.round((cd.lotSquareFeet / 43560) * 100) / 100 : 0,
+      squareFeet: sqft,
+      lotAcres: acres(cd.lotSquareFeet) ?? 0,
       yearBuilt: Number(cd.yearBuilt) || 0,
       latitude: c.latitude ?? null,
       longitude: c.longitude ?? null,
       image: pickImage(c.images),
+      images: imgs,
+      pricePerSqft:
+        cd.lastSaleAmount && sqft ? Math.round((cd.lastSaleAmount / sqft) * 100) / 100 : null,
+      occupancy: cd.occupancy ?? null,
+      stories: cd.stories ?? null,
+      heatingType: cd.heatingType ?? null,
+      acType: cd.airConditioningType ?? null,
+      exteriorWallType: cd.exteriorWallType ?? null,
+      garageType: cd.garageType ?? null,
+      hoaPresent: cd.hoaPresent != null ? (cd.hoaPresent ? 'Yes' : 'No') : null,
+      mlsStatus: m.status ?? null,
+      mlsNumber: m.mlsNumber ?? null,
+      mlsName: m.mlsName ?? null,
+      agentName: m.agent?.agentName ?? null,
+      daysOnMarket: m.daysOnMarket ?? cd.daysOnMarket ?? null,
+      priceHistory: history,
     };
   });
+
+  const taxes: TaxYear[] = Array.isArray(own.taxes)
+    ? own.taxes.slice(0, 6).map((t: any) => ({
+        year: t.year ?? null,
+        assessedValue: t.assessedValue ?? null,
+        taxAmount: t.taxAmount ?? t.amount ?? null,
+      }))
+    : [];
 
   return {
     id: raw.id,
@@ -332,46 +474,57 @@ export function mapLiveResponse(raw: any, requestedAddress: string): BrickedProp
       baths: det.bathrooms ?? null,
       squareFeet: det.squareFeet ?? null,
       yearBuilt: det.yearBuilt ?? null,
-      lotAcres: det.lotSquareFeet ? Math.round((det.lotSquareFeet / 43560) * 100) / 100 : null,
+      lotAcres: acres(det.lotSquareFeet),
       latitude: p.latitude ?? null,
       longitude: p.longitude ?? null,
       lastSalePrice: det.lastSaleAmount ?? null,
       lastSaleDate: msToDate(det.lastSaleDate),
-      landUse: land.landUse ?? null,
       occupancy: det.occupancy ?? null,
-      apn: land.apn ?? null,
+      stories: det.stories ?? null,
+      basementType: det.basementType ?? null,
+      basementSquareFeet: det.basementSquareFeet ?? null,
+      airConditioningType: det.airConditioningType ?? null,
+      heatingType: det.heatingType ?? null,
+      heatingFuelType: det.heatingFuelType ?? null,
+      hoaPresent: det.hoaPresent != null ? (det.hoaPresent ? 'Yes' : 'No') : null,
+      hoaFee: det.hoa1Fee ?? null,
+      hoaFeeFrequency: det.hoa1FeeFrequency ?? null,
+      fireplaces: det.fireplaces ?? null,
+      exteriorWallType: det.exteriorWallType ?? null,
+      daysOnMarket: det.daysOnMarket ?? null,
+      marketStatus: det.marketStatus ?? null,
       legalDescription: det.legalDescription ?? null,
+      landUse: land.landUse ?? null,
+      apn: land.apn ?? null,
+      propertyClass: land.propertyClass ?? null,
+      lotNumber: land.lotNumber ?? null,
+      block: land.block ?? null,
+      schoolDistrict: land.schoolDistrict ?? null,
+      subdivision: land.subdivision ?? null,
+      countyName: land.countyName ?? null,
+      openMortgageBalance: debt.openMortgageBalance ?? null,
+      estimatedEquity: debt.estimatedEquity ?? null,
+      purchaseMethod: debt.purchaseMethod ?? null,
+      ltvRatio: debt.ltvRatio ?? null,
+      itvRatio: debt.itvRatio ?? null,
       owner1: ownerName(own.owners?.[0]),
       owner2: ownerName(own.owners?.[1]),
       ownerType: own.ownerType ?? null,
-      openMortgageBalance: debt.openMortgageBalance ?? null,
-      estimatedEquity: debt.estimatedEquity ?? null,
+      ownerOccupancy: own.ownerOccupancy ?? null,
       taxAmount: own.taxAmount ?? null,
     },
+    taxes,
     comps,
     cmv: raw.cmv ?? null,
     arv: raw.arv ?? null,
     rentEstimate: det.rentEstimate ?? null,
     repairs,
     totalRepairCost,
-    renovationScore: reno.confidence ?? reno.score ?? 1,
-    mortgages: (debt.mortgages ?? []).map((m: any) => ({
-      amount: Number(m.amount) || 0,
-      rate: pct(m.interestRate),
-      loan: m.loanType ?? m.termDescription ?? 'Unknown',
-      recorded: msToDate(m.recordingDate) ?? '—',
-      lender: m.lenderName ?? 'Unknown',
-    })),
-    saleHistory: (own.transactions ?? []).map((t: any) => ({
-      date: msToDate(t.saleDate) ?? 'Unknown',
-      amount: Number(t.amount) || 0,
-      method: t.purchaseMethod ?? 'Unknown',
-      seller: t.sellerNames ?? 'N/A',
-      buyer: t.buyerNames ?? 'N/A',
-    })),
-    images: Array.isArray(p.images) ? p.images : [],
+    renovationScore: reno.hasScore ? (reno.confidence ?? reno.score ?? null) : null,
+    images: photos(p.images),
     shareLink: raw.shareLink ?? '',
     dashboardLink: raw.dashboardLink ?? '',
+    savedOffer: null,
   };
 }
 

@@ -140,6 +140,12 @@ export const snapshots = {
     );
     return snapshots.byId(id);
   },
+  /** Persist edited property JSON + recomputed valuation (comp selection, saved
+   *  offer). Free, no Bricked call — these are user edits on stored data. */
+  updateJson(id: string, raw_json: string, arv: number | null, cmv: number | null): SnapshotRow | undefined {
+    db.prepare('UPDATE property_snapshot SET raw_json=?, arv=?, cmv=? WHERE id=?').run(raw_json, arv, cmv, id);
+    return snapshots.byId(id);
+  },
 };
 
 // ── usage events (append-only) ───────────────────────────────────────────────

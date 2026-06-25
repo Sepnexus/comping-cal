@@ -43,6 +43,15 @@ const STALE_AFTER_DAYS = 30;
 
 export function toPublicSnapshot(row: SnapshotRow): PublicSnapshot {
   const property = JSON.parse(row.raw_json) as BrickedProperty;
+  // Backfill fields added after a snapshot was stored, so pre-upgrade snapshots
+  // render in the current UI without crashing on missing arrays/objects.
+  if (!Array.isArray(property.taxes)) property.taxes = [];
+  if (property.savedOffer === undefined) property.savedOffer = null;
+  property.comps = (property.comps ?? []).map((c) => ({
+    ...c,
+    images: Array.isArray(c.images) ? c.images : [],
+    priceHistory: Array.isArray(c.priceHistory) ? c.priceHistory : [],
+  }));
   const ageMs = Date.now() - new Date(row.taken_at).getTime();
   return {
     id: row.id,
@@ -58,6 +67,16 @@ export function toPublicSnapshot(row: SnapshotRow): PublicSnapshot {
     property,
     stale: ageMs > STALE_AFTER_DAYS * 86_400_000,
   };
+}
+
+/** ARV from the currently-selected comps: the mean of their adjusted values
+ *  (each already normalised to the subject). Free, deterministic, transparent —
+ *  toggling which comps are "in the deal" re-derives the headline ARV. */
+export function arvFromComps(comps: BrickedProperty['comps']): number | null {
+  const sel = comps.filter((c) => c.selected && c.adjusted_value > 0);
+  if (sel.length === 0) return null;
+  const mean = sel.reduce((s, c) => s + c.adjusted_value, 0) / sel.length;
+  return Math.round(mean);
 }
 
 function perCompPrice(loc: LocationRow): number {
