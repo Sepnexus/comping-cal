@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Installs root + server + web workspaces. better-sqlite3 uses a linux prebuild.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck server
+        run: npx tsc --noEmit
+        working-directory: server
+
+      # `npm run build -w web` runs `tsc --noEmit && vite build` — typechecks and bundles.
+      - name: Typecheck & build web
+        run: npm run build -w web
+
+      - name: Seed smoke test (clean DB boots)
+        run: npm run seed -w server
