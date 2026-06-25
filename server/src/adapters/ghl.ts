@@ -83,31 +83,37 @@ export type WalletChargeResult =
   | { ok: false; reason: string };
 
 /**
- * Charge one comp via the agency's billing endpoint. The endpoint performs the
- * actual deduction and returns success/failed + a reason — we just relay it. A
- * failure flips the account to the billing-issue gate (FRD §7.5).
+ * Charge one comp via the agency's n8n billing webhook (GHL_CHARGE_URL). The webhook
+ * reads `locationId` + `contactId` from the query string, looks up the location's GHL
+ * OAuth token, and posts a 1-unit charge to GHL marketplace billing. It answers:
+ *   • HTTP 200  → charge succeeded
+ *   • HTTP 402  → declined (e.g. insufficient wallet balance); the human-readable
+ *                  reason is returned in the `message` response header.
+ * A failure flips the account to the billing-issue gate so we never call Bricked.
  *
  * Mock injection: a ghlLocationId containing "failwallet"/"empty" → declined.
  */
 export async function chargeWallet(
   ghlLocationId: string,
-  amount: number,
+  _amount: number,
   idempotencyKey: string,
   contactId?: string,
 ): Promise<WalletChargeResult> {
   if (live() && settings.ghlChargeUrl()) {
     try {
-      const res = await fetch(settings.ghlChargeUrl(), {
-        method: 'POST',
-        headers: authHeaders({ 'idempotency-key': idempotencyKey }),
-        body: JSON.stringify({ locationId: ghlLocationId, contactId, amount, currency: 'USD', idempotencyKey, type: 'comp' }),
-      });
-      const body: any = await res.json().catch(() => ({}));
-      const status = String(body.status ?? (res.ok ? 'success' : 'failed')).toLowerCase();
-      if (res.ok && (status === 'success' || status === 'succeeded' || status === 'ok')) {
-        return { ok: true, transactionId: body.transactionId ?? body.id };
+      const url = new URL(settings.ghlChargeUrl());
+      url.searchParams.set('locationId', ghlLocationId);
+      if (contactId) url.searchParams.set('contactId', contactId);
+      const res = await fetch(url, { method: 'POST', headers: authHeaders({ 'idempotency-key': idempotencyKey }) });
+      if (res.status === 200) {
+        await res.text().catch(() => '');
+        return { ok: true, transactionId: idempotencyKey.slice(0, 16) };
       }
-      return { ok: false, reason: body.reason ?? body.message ?? `charge_failed_${res.status}` };
+      // n8n returns the failure detail in the `message` header; fall back to the body.
+      const headerMsg = res.headers.get('message');
+      const body = await res.text().catch(() => '');
+      const reason = headerMsg || body || (res.status === 402 ? 'Insufficient wallet balance' : `charge_failed_${res.status}`);
+      return { ok: false, reason };
     } catch (e) {
       return { ok: false, reason: 'charge_endpoint_unreachable' };
     }
