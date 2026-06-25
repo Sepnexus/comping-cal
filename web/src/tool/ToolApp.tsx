@@ -74,8 +74,14 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
       setSession(info);
       // Names come from the verified session, not the URL (URL data is untrusted).
       setLocName(info.location?.name?.trim() || 'Unnamed location');
-      setContactName(info.contact?.name ?? ctx.contactName ?? 'Contact');
-      const addr = info.contact?.address ?? '';
+      // The contact button can pass the contact's name + address straight from the
+      // GHL page (?name=&address=) — handy when the GHL contact endpoint isn't wired.
+      // The server fetch wins when available; the URL values are the fallback/pre-fill.
+      const qs = new URLSearchParams(window.location.search);
+      const urlName = qs.get('name')?.trim() || '';
+      const urlAddr = qs.get('address')?.trim() || '';
+      setContactName(info.contact?.name?.trim() || urlName || ctx.contactName || 'Contact');
+      const addr = info.contact?.address?.trim() || urlAddr;
       setAddress(addr);
 
       // pull recent history for this location (free)
