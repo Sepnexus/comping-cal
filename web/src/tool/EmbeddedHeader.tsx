@@ -14,18 +14,44 @@ export function EmbeddedHeader({
   contactName,
   locationName,
   onSwitchLocation,
+  onRenameLocation,
   allowSwitch = false,
 }: {
   screen: 'workspace' | 'history';
   contactName: string;
   locationName: string;
   onSwitchLocation?: (ghlLocationId: string) => void;
+  onRenameLocation?: (name: string) => void | Promise<void>;
   allowSwitch?: boolean;
 }) {
   const nav = useNavigate();
   const [locs, setLocs] = useState<{ ghlLocationId: string; name: string; status: string }[]>([]);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Inline rename of the location (e.g. naming an auto-provisioned "Unnamed location").
+  const unnamed = !locationName || locationName === 'Unnamed location';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const startEdit = () => {
+    setDraft(unnamed ? '' : locationName);
+    setEditing(true);
+  };
+  const saveName = async () => {
+    const name = draft.trim();
+    if (!name || name === locationName) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onRenameLocation?.(name);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (allowSwitch) devLocations().then(setLocs).catch(() => {});
@@ -63,8 +89,57 @@ export function EmbeddedHeader({
 
   const contactLabel = (
     <>
-      Contact <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{contactName}</strong> · {locationName}
+      Contact <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{contactName}</strong>
     </>
+  );
+
+  // Editable location-name chip shown after the contact, in both dev and prod layouts.
+  const locNamePart = editing ? (
+    <input
+      autoFocus
+      value={draft}
+      disabled={saving}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={saveName}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') saveName();
+        if (e.key === 'Escape') setEditing(false);
+      }}
+      placeholder="Name this location"
+      style={{
+        font: 'inherit',
+        fontSize: 12.5,
+        padding: '2px 8px',
+        borderRadius: 7,
+        border: '1px solid var(--brand)',
+        background: 'var(--surface)',
+        color: 'var(--text)',
+        width: 180,
+        outline: 'none',
+      }}
+    />
+  ) : (
+    <button
+      onClick={startEdit}
+      title="Click to rename this location"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        font: 'inherit',
+        fontSize: 12.5,
+        fontStyle: unnamed ? 'italic' : 'normal',
+        color: unnamed ? 'var(--brand)' : 'var(--text2)',
+        padding: 0,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {unnamed ? 'Name this location' : locationName}
+      <Icon path="M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" size={12} stroke="var(--muted)" width={2} />
+    </button>
   );
 
   return (
@@ -171,6 +246,8 @@ export function EmbeddedHeader({
         ) : (
           <span style={{ color: 'var(--text2)', fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contactLabel}</span>
         )}
+        <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>·</span>
+        {locNamePart}
       </div>
 
       <div style={{ flex: 1 }} />

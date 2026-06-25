@@ -3,7 +3,7 @@ import { requireLocation } from '../middleware/auth.js';
 import { fetchContact, writeBackContact } from '../adapters/ghl.js';
 import { runComp, generateRepairs, toPublicSnapshot } from '../engine/comp.js';
 import { computeOffer, STRATEGIES, type StrategyId } from '../engine/offer.js';
-import { snapshots, usage, writebacks } from '../db/repos.js';
+import { locations, snapshots, usage, writebacks } from '../db/repos.js';
 import { normalizeAddress } from '../util/crypto.js';
 
 export const toolRouter = Router();
@@ -26,6 +26,22 @@ toolRouter.post('/lookup', requireLocation, (req, res) => {
     return;
   }
   res.json({ ok: true, found: true, snapshot: toPublicSnapshot(row) });
+});
+
+/**
+ * POST /location/name — set/update this location's display name. Lets the user
+ * name an auto-provisioned ("Unnamed") location from inside the tool, no admin
+ * round-trip. Scoped to the launched location; free, no usage event.
+ */
+toolRouter.post('/location/name', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const name = String(req.body?.name ?? '').trim();
+  if (!name) {
+    res.status(422).json({ ok: false, error: 'name_required', message: 'Enter a location name.' });
+    return;
+  }
+  const updated = locations.update(loc.id, { name: name.slice(0, 120) });
+  res.json({ ok: true, name: updated?.name ?? name });
 });
 
 /**

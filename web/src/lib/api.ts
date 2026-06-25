@@ -78,6 +78,9 @@ export const toolApi = {
   lookup(opts: { address: string }): Promise<{ ok: true; found: boolean; snapshot?: PublicSnapshot }> {
     return post('/lookup', opts);
   },
+  setLocationName(opts: { name: string }): Promise<{ ok: true; name: string }> {
+    return post('/location/name', opts);
+  },
   async comp(opts: { address: string; refresh?: boolean; overrides?: Record<string, unknown> }): Promise<{
     ok: true;
     charged: boolean;

@@ -181,6 +181,14 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
     window.history.pushState(null, '', '/');
   }, []);
 
+  // Rename the launched location (e.g. naming an auto-provisioned one) from the header.
+  const renameLocation = useCallback(async (name: string) => {
+    const r = await toolApi.setLocationName({ name });
+    setLocName(r.name);
+    setToast({ kind: 'saved', msg: 'Location name updated' });
+    setTimeout(() => setToast(null), 2200);
+  }, []);
+
   // History screen is its own route → opening a row navigates to the comp view,
   // preserving the launch params (locationId/token) and adding ?property=<id>.
   if (screen === 'history') {
@@ -190,14 +198,14 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
       navigate('/?' + sp.toString()); // client-side → preserves the launch context
     };
     return (
-      <Shell screen="history" contactName={contactName} locName={locName} onSwitchLocation={bootstrap} allowSwitch={!launchedViaUrl}>
+      <Shell screen="history" contactName={contactName} locName={locName} onSwitchLocation={bootstrap} onRenameLocation={renameLocation} allowSwitch={!launchedViaUrl}>
         <History onOpen={openFromHistory} ready={ready} />
       </Shell>
     );
   }
 
   return (
-    <Shell screen="workspace" contactName={contactName} locName={locName} onSwitchLocation={bootstrap} allowSwitch={!launchedViaUrl}>
+    <Shell screen="workspace" contactName={contactName} locName={locName} onSwitchLocation={bootstrap} onRenameLocation={renameLocation} allowSwitch={!launchedViaUrl}>
       <div style={{ maxWidth: ws === 'result' ? 1180 : 1180, margin: '0 auto', padding: '26px 28px 60px' }}>
         {ws === 'verifying' && <VerifyingCard />}
         {ws === 'accessDenied' && <AccessDeniedCard />}
@@ -249,6 +257,7 @@ function Shell({
   contactName,
   locName,
   onSwitchLocation,
+  onRenameLocation,
   allowSwitch,
 }: {
   children: React.ReactNode;
@@ -256,11 +265,12 @@ function Shell({
   contactName: string;
   locName: string;
   onSwitchLocation: (id: string) => void;
+  onRenameLocation: (name: string) => void | Promise<void>;
   allowSwitch: boolean;
 }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)' }}>
-      <EmbeddedHeader screen={screen} contactName={contactName} locationName={locName} onSwitchLocation={onSwitchLocation} allowSwitch={allowSwitch} />
+      <EmbeddedHeader screen={screen} contactName={contactName} locationName={locName} onSwitchLocation={onSwitchLocation} onRenameLocation={onRenameLocation} allowSwitch={allowSwitch} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', position: 'relative' }} key={screen}>
         <div style={{ animation: 'fadeUp .4s ease both' }}>{children}</div>
       </div>
