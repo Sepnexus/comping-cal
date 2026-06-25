@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { settings } from '../db/settings.js';
 
 /**
  * Bricked.ai integration (FRD §5). Auth is x-api-key, server-side only — the key
@@ -380,7 +381,7 @@ async function createLive(params: CreatePropertyParams): Promise<BrickedResult> 
     if (v != null && v !== '') url.searchParams.set(k, String(v));
   }
   try {
-    const res = await fetch(url, { headers: { 'x-api-key': config.bricked.apiKey } });
+    const res = await fetch(url, { headers: { 'x-api-key': settings.brickedApiKey() } });
     if (res.status === 200) {
       const raw = await res.json();
       return { ok: true, status: 200, property: mapLiveResponse(raw, params.address) };
@@ -393,8 +394,9 @@ async function createLive(params: CreatePropertyParams): Promise<BrickedResult> 
 }
 
 export const bricked = {
-  /** GET /v1/property/create — the only billable call (FRD §5.1). */
+  /** GET /v1/property/create — the only billable call (FRD §5.1). Mode + key are
+   *  admin-managed (settings) so they can be changed without a redeploy. */
   createProperty(params: CreatePropertyParams): Promise<BrickedResult> {
-    return config.bricked.mode === 'live' ? createLive(params) : createMock(params);
+    return settings.brickedMode() === 'live' ? createLive(params) : createMock(params);
   },
 };

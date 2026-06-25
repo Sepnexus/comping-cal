@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { config } from '../config.js';
+import { settings } from '../db/settings.js';
 import { locations } from '../db/repos.js';
 import { launchTokenFor } from '../util/crypto.js';
 
@@ -11,7 +11,7 @@ import { launchTokenFor } from '../util/crypto.js';
 export const devRouter = Router();
 
 devRouter.get('/launch-context', (req, res) => {
-  if (config.ghl.mode === 'live') {
+  if (settings.ghlMode() === 'live') {
     res.status(404).json({ ok: false, error: 'disabled_in_live' });
     return;
   }
@@ -37,7 +37,7 @@ devRouter.get('/launch-context', (req, res) => {
 });
 
 devRouter.get('/locations', (req, res) => {
-  if (config.ghl.mode === 'live') {
+  if (settings.ghlMode() === 'live') {
     res.status(404).json({ ok: false, error: 'disabled_in_live' });
     return;
   }

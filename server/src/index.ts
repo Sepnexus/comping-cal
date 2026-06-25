@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { config } from './config.js';
 import './db/index.js'; // applies schema on import
+import { settings } from './db/settings.js';
 import { toolRouter } from './routes/tool.js';
 import { adminRouter } from './routes/admin.js';
 import { devRouter } from './routes/dev.js';
@@ -15,7 +16,7 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (_req, res) =>
-  res.json({ ok: true, service: 'bricked-comping', brickedMode: config.bricked.mode, ghlMode: config.ghl.mode }),
+  res.json({ ok: true, service: 'bricked-comping', brickedMode: settings.brickedMode(), ghlMode: settings.ghlMode() }),
 );
 
 app.use('/api', toolRouter); // tool endpoints (FRD §9)
@@ -42,5 +43,5 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 app.listen(config.port, () => {
   console.log(`▸ Bricked Comping API on http://localhost:${config.port}`);
-  console.log(`  Bricked: ${config.bricked.mode} · GHL: ${config.ghl.mode}`);
+  console.log(`  Bricked: ${settings.brickedMode()} · GHL: ${settings.ghlMode()}`);
 });

@@ -224,23 +224,36 @@ adminRouter.get('/pnl', requireAdmin, (_req, res) => {
   res.json({ ok: true, rows: rows.reverse(), totals, byAccount });
 });
 
-// ── Settings (FRD §7.7.4) — secrets are env-only (masked); pricing/limits are
-//    editable and persisted in app_setting. ───────────────────────────────────
+// ── Settings (FRD §7.7.4) — pricing AND integration keys are editable and persisted
+//    in app_setting, so they can be managed from the admin UI without SSH/redeploy.
+//    Secret values are returned masked (never in full); only the HMAC root secret is
+//    env-only (rotating it would invalidate tokens). ───────────────────────────────
 function settingsPayload() {
-  const mask = (s: string) => (s ? `••••••••••••${s.slice(-4)}` : 'not set');
+  const mask = (s: string) => (s ? `••••••••${s.slice(-4)}` : '');
   const eff = settings.all();
-  const endpointsSet = [config.ghl.contactUrl, config.ghl.chargeUrl, config.ghl.writebackUrl].filter(Boolean).length;
+  const brickedKey = settings.brickedApiKey();
+  const ghlKey = settings.ghlApiKey();
   return {
-    brickedKeyMasked: config.bricked.apiKey ? mask(config.bricked.apiKey) : 'mock mode',
-    ghlClientMasked: config.ghl.apiKey ? `${endpointsSet}/3 endpoints · key ${mask(config.ghl.apiKey)}` : 'mock mode',
-    hmacSecretMasked: mask(config.hmacSecret),
-    launchPasswordSet: !!config.launchPassword,
+    // pricing / limits
     defaultPerCompPrice: eff.defaultPerCompPrice,
     brickedCost: eff.brickedCost,
     globalCostCeiling: eff.globalCostCeiling,
     compLookback: eff.compLookback,
-    brickedMode: config.bricked.mode,
-    ghlMode: config.ghl.mode,
+    // bricked
+    brickedMode: settings.brickedMode(),
+    brickedKeySet: !!brickedKey,
+    brickedKeyMasked: mask(brickedKey),
+    // ghl
+    ghlMode: settings.ghlMode(),
+    ghlContactUrl: settings.ghlContactUrl(),
+    ghlChargeUrl: settings.ghlChargeUrl(),
+    ghlWritebackUrl: settings.ghlWritebackUrl(),
+    ghlKeySet: !!ghlKey,
+    ghlKeyMasked: mask(ghlKey),
+    // launch password (lives in client-side JS anyway → shown in full so admin can copy it)
+    launchPassword: settings.launchPassword(),
+    // read-only
+    hmacSecretMasked: mask(config.hmacSecret),
   };
 }
 
@@ -251,19 +264,30 @@ adminRouter.get('/settings', requireAdmin, (_req, res) => {
 adminRouter.patch('/settings', requireAdmin, (req, res) => {
   const body = req.body ?? {};
   const num = (v: unknown) => (v == null || v === '' ? undefined : Number(v));
-  const patch = {
+  const pricing = {
     defaultPerCompPrice: num(body.defaultPerCompPrice),
     brickedCost: num(body.brickedCost),
     globalCostCeiling: num(body.globalCostCeiling),
     compLookback: num(body.compLookback),
   };
-  // Reject non-numeric submissions outright so a typo can't blank a price.
-  for (const [k, v] of Object.entries(patch)) {
+  for (const [k, v] of Object.entries(pricing)) {
     if (v !== undefined && (!Number.isFinite(v) || (v as number) < 0)) {
       res.status(422).json({ ok: false, error: 'invalid', message: `${k} must be a non-negative number` });
       return;
     }
   }
-  settings.update(patch);
+  settings.update(pricing);
+  // Integration: modes/URLs/launch password update when provided; API keys only when
+  // a real new value is given (so saving without retyping never wipes a key).
+  settings.updateIntegration({
+    brickedMode: body.brickedMode,
+    brickedApiKey: body.brickedApiKey,
+    ghlMode: body.ghlMode,
+    ghlContactUrl: body.ghlContactUrl,
+    ghlChargeUrl: body.ghlChargeUrl,
+    ghlWritebackUrl: body.ghlWritebackUrl,
+    ghlApiKey: body.ghlApiKey,
+    launchPassword: body.launchPassword,
+  });
   res.json({ ok: true, settings: settingsPayload() });
 });

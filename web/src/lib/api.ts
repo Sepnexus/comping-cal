@@ -145,5 +145,5 @@ export const adminApi = {
   usage: () => adminGet('/usage'),
   pnl: () => adminGet('/pnl'),
   settings: () => adminGet('/settings'),
-  updateSettings: (patch: Record<string, number>) => adminSend('/settings', 'PATCH', patch),
+  updateSettings: (patch: Record<string, string | number>) => adminSend('/settings', 'PATCH', patch),
 };

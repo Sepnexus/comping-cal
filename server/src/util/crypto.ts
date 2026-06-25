@@ -6,6 +6,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { config } from '../config.js';
+import { settings } from '../db/settings.js';
 
 export const uuid = (): string => randomUUID();
 
@@ -32,17 +33,19 @@ export function verifyLocationToken(ghlLocationId: string, token: string): boole
 }
 
 /**
- * Shared launch password (the secret baked into the GHL custom-JS button). When
- * set, a launch is valid if its token equals this password. Constant-time.
+ * Shared launch password (the secret baked into the GHL custom-JS button). It is
+ * admin-managed (settings, env as fallback). When set, a launch is valid if its
+ * token equals this password. Constant-time.
  */
 export function verifyLaunchPassword(token: string): boolean {
-  if (!config.launchPassword) return false;
-  return constantTimeEqual(config.launchPassword, token);
+  const pw = settings.launchPassword();
+  if (!pw) return false;
+  return constantTimeEqual(pw, token);
 }
 
 /** The token to put in a launch URL: the shared password if set, else the HMAC. */
 export function launchTokenFor(ghlLocationId: string): string {
-  return config.launchPassword || locationToken(ghlLocationId);
+  return settings.launchPassword() || locationToken(ghlLocationId);
 }
 
 // ── Admin password hashing (scrypt; salt stored alongside the hash) ───────────

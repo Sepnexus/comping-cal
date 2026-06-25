@@ -34,26 +34,22 @@ cd comping-cal
 
 ---
 
-## Step 3 — Create `.env`
+## Step 3 — Create `.env` (bootstrap only)
+
+The `.env` holds just the domain + server secrets + admin login. The **Bricked key,
+GHL endpoints, launch password, and pricing are set in Admin → Settings** after you
+log in — no need to put them here.
 
 ```bash
 cp .env.vps.example .env
-# generate two secrets:
+# generate the two server secrets:
 echo "HMAC_SECRET=$(openssl rand -hex 32)"
 echo "ADMIN_JWT_SECRET=$(openssl rand -hex 32)"
 nano .env
 ```
 
-Fill in:
-- `PUBLIC_HOST` + `TOOL_PUBLIC_URL` — your domain from Step 1.
-- `HMAC_SECRET`, `ADMIN_JWT_SECRET` — paste the generated values.
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` — your admin login (created on first boot).
-- `BRICKED_API_KEY` — the live Bricked key (`BRICKED_MODE=live`).
-- `GHL_CONTACT_URL`, `GHL_CHARGE_URL`, `GHL_WRITEBACK_URL`, `GHL_API_KEY` — your GHL
-  endpoints (`GHL_MODE=live`). Leave blank + set `GHL_MODE=mock` to launch without
-  GHL wired yet (Bricked still runs live).
-- `LAUNCH_PASSWORD` — the shared secret you'll also put in the contact button JS.
-
+Fill in: `PUBLIC_HOST` / `TOOL_PUBLIC_URL` (your domain), `HMAC_SECRET`,
+`ADMIN_JWT_SECRET` (the generated values), and `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 Save: `Ctrl+O`, Enter, `Ctrl+X`.
 
 ---
@@ -92,13 +88,27 @@ Open **https://comps.srv844822.hstgr.cloud/admin/login** and sign in with your a
 
 ---
 
-## Step 6 — Wire the GHL button
+## Step 6 — Configure integrations in the admin UI
+
+In **Admin → Settings** (no SSH needed):
+- **Bricked** → set mode `live` + paste the Bricked API key.
+- **GoHighLevel** → set mode `live` + paste your contact / charge / write-back
+  endpoints + API key (leave `mock` to run without GHL while testing).
+- **Launch password** → set or **Generate** one, **Copy** it (you'll paste it into
+  the contact button next).
+- **Pricing** → per-comp price, ceiling, lookback as needed.
+
+Click **Save settings** — changes take effect on the next comp.
+
+---
+
+## Step 7 — Wire the GHL button
 
 Edit [`integrations/ghl-comp-button.js`](integrations/ghl-comp-button.js), set:
 
 ```js
 var TOOL_URL = 'https://comps.srv844822.hstgr.cloud';
-var LAUNCH_PASSWORD = '<the same LAUNCH_PASSWORD from .env>';
+var LAUNCH_PASSWORD = '<the launch password you set/copied in Admin → Settings>';
 ```
 
 Paste it into the GHL agency **Custom JS**. A "Get ARV" button appears on contacts;

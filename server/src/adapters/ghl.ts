@@ -1,4 +1,4 @@
-import { config } from '../config.js';
+import { settings } from '../db/settings.js';
 
 /**
  * GHL integration — custom-JS button model (no marketplace app / OAuth / SSO).
@@ -21,9 +21,10 @@ export interface GhlContact {
   notes?: string;
 }
 
-const live = () => config.ghl.mode === 'live';
+const live = () => settings.ghlMode() === 'live';
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  return { 'content-type': 'application/json', ...(config.ghl.apiKey ? { 'x-api-key': config.ghl.apiKey } : {}), ...extra };
+  const key = settings.ghlApiKey();
+  return { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}), ...extra };
 }
 
 // ── Contact fetch ────────────────────────────────────────────────────────────
@@ -53,9 +54,9 @@ function mapContact(raw: any, contactId: string): GhlContact {
 }
 
 export async function fetchContact(ghlLocationId: string, contactId: string): Promise<GhlContact | null> {
-  if (live() && config.ghl.contactUrl) {
+  if (live() && settings.ghlContactUrl()) {
     try {
-      const url = new URL(config.ghl.contactUrl);
+      const url = new URL(settings.ghlContactUrl());
       url.searchParams.set('locationId', ghlLocationId);
       url.searchParams.set('contactId', contactId);
       const res = await fetch(url, { headers: authHeaders() });
@@ -94,9 +95,9 @@ export async function chargeWallet(
   idempotencyKey: string,
   contactId?: string,
 ): Promise<WalletChargeResult> {
-  if (live() && config.ghl.chargeUrl) {
+  if (live() && settings.ghlChargeUrl()) {
     try {
-      const res = await fetch(config.ghl.chargeUrl, {
+      const res = await fetch(settings.ghlChargeUrl(), {
         method: 'POST',
         headers: authHeaders({ 'idempotency-key': idempotencyKey }),
         body: JSON.stringify({ locationId: ghlLocationId, contactId, amount, currency: 'USD', idempotencyKey, type: 'comp' }),
@@ -125,9 +126,9 @@ export async function writeBackContact(
   contactId: string,
   fields: Record<string, number | string>,
 ): Promise<WritebackResult> {
-  if (live() && config.ghl.writebackUrl) {
+  if (live() && settings.ghlWritebackUrl()) {
     try {
-      const res = await fetch(config.ghl.writebackUrl, {
+      const res = await fetch(settings.ghlWritebackUrl(), {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ locationId: ghlLocationId, contactId, fields }),
