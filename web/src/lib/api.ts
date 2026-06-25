@@ -75,6 +75,9 @@ export const toolApi = {
   verify(): Promise<SessionInfo & { ok: true }> {
     return post('/session/verify', {});
   },
+  lookup(opts: { address: string }): Promise<{ ok: true; found: boolean; snapshot?: PublicSnapshot }> {
+    return post('/lookup', opts);
+  },
   async comp(opts: { address: string; refresh?: boolean; overrides?: Record<string, unknown> }): Promise<{
     ok: true;
     charged: boolean;

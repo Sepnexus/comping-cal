@@ -221,11 +221,8 @@ export function ConfirmScreen({
 
       <button onClick={onComp} style={{ width: '100%', height: 52, borderRadius: 13, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 700, fontSize: 15.5, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, boxShadow: 'var(--shadow)' }}>
         <Icon path={ic.bolt} size={18} width={2.1} />
-        Comp this property <span style={{ opacity: 0.8, fontWeight: 600 }}>· 1 use</span>
+        Comp this property
       </button>
-      <p style={{ textAlign: 'center', margin: '12px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
-        Viewing a saved property is always free. You're only charged when a new comp runs.
-      </p>
 
       {recent.length > 0 && (
         <>

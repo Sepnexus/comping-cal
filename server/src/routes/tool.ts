@@ -4,8 +4,29 @@ import { fetchContact, writeBackContact } from '../adapters/ghl.js';
 import { runComp, generateRepairs, toPublicSnapshot } from '../engine/comp.js';
 import { computeOffer, STRATEGIES, type StrategyId } from '../engine/offer.js';
 import { snapshots, usage, writebacks } from '../db/repos.js';
+import { normalizeAddress } from '../util/crypto.js';
 
 export const toolRouter = Router();
+
+/**
+ * POST /lookup — free check whether a saved snapshot already exists for an address
+ * on this location (same normalization as the comp dedupe). Used on launch to open
+ * an existing comp instead of re-charging. No Bricked call, no usage event.
+ */
+toolRouter.post('/lookup', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const address = String(req.body?.address ?? '').trim();
+  if (!address) {
+    res.json({ ok: true, found: false });
+    return;
+  }
+  const row = snapshots.latestForAddress(loc.id, normalizeAddress(address));
+  if (!row) {
+    res.json({ ok: true, found: false });
+    return;
+  }
+  res.json({ ok: true, found: true, snapshot: toPublicSnapshot(row) });
+});
 
 /**
  * POST /session/verify — validate token, bind session to location, resolve the

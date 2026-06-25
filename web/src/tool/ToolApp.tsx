@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmbeddedHeader } from './EmbeddedHeader';
-import { ConfirmModal } from './modals';
 import { ResultPanel } from './ResultPanel';
 import { History } from './History';
 import {
@@ -15,7 +14,6 @@ import {
 } from './WorkspaceStates';
 import { devLaunchContext, getLaunchContext, launchContextFromUrl, setLaunchContext, toolApi } from '../lib/api';
 import type { HistoryItem, PublicSnapshot, SessionInfo } from '../lib/types';
-import { normalizeLoose } from './util';
 
 type WsState =
   | 'verifying'
@@ -38,7 +36,6 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
   const [address, setAddress] = useState('');
   const [snapshot, setSnapshot] = useState<PublicSnapshot | null>(null);
   const [fallback, setFallback] = useState<Fallback | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [toast, setToast] = useState<{ kind: 'charged' | 'free' | 'saved'; msg: string } | null>(null);
   const [locName, setLocName] = useState('…');
@@ -105,11 +102,12 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
         setWs('addressMissing');
         return;
       }
-      // "already-comped" → show the saved snapshot instantly, free (FRD §2)
-      const existing = hist.items.find((i) => normalizeLoose(i.address) === normalizeLoose(addr));
-      if (existing) {
-        const got = await toolApi.property(existing.id);
-        setSnapshot(got.snapshot);
+      // Already comped this address on this location → open the saved snapshot
+      // instantly (free). Uses the same normalization as the comp dedupe, so it
+      // matches even when the launch address differs slightly from the stored one.
+      const look = await toolApi.lookup({ address: addr }).catch(() => ({ ok: true as const, found: false as const }));
+      if (look.found && look.snapshot) {
+        setSnapshot(look.snapshot);
         setWs('result');
         return;
       }
@@ -127,7 +125,6 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
 
   const runComp = useCallback(
     async (opts: { address: string; refresh?: boolean; overrides?: Record<string, unknown> }) => {
-      setConfirmOpen(false);
       setWs('running');
       setFallback(null);
       runningCount.current = 8 + Math.floor(Math.random() * 12);
@@ -135,8 +132,8 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
         const res = await toolApi.comp(opts);
         setSnapshot(res.snapshot);
         setWs('result');
-        if (res.charged) flashToast({ kind: 'charged', msg: '1 comp used · charged to GHL wallet' });
-        else if (res.freeReason === 'cached_view') flashToast({ kind: 'free', msg: 'Saved snapshot — free to view' });
+        if (res.charged) flashToast({ kind: 'charged', msg: 'Comp complete' });
+        else if (res.freeReason === 'cached_view') flashToast({ kind: 'free', msg: 'Opened saved comp' });
         // refresh recent list
         toolApi.history().then((h) => setRecent(h.items.slice(0, 3))).catch(() => {});
       } catch (err: any) {
@@ -163,7 +160,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
       if (!snapshot) return;
       const res = await toolApi.repairs({ snapshotId: snapshot.id, repairsText: text });
       setSnapshot(res.snapshot);
-      if (res.charged) flashToast({ kind: 'charged', msg: '1 comp used · repair estimate generated' });
+      if (res.charged) flashToast({ kind: 'charged', msg: 'Repair estimate added' });
     },
     [snapshot, flashToast],
   );
@@ -215,7 +212,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
           <AddressMissingCard
             value={address}
             onChange={setAddress}
-            onContinue={() => setConfirmOpen(true)}
+            onContinue={() => runComp({ address })}
           />
         )}
         {ws === 'confirm' && (
@@ -224,7 +221,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
             subject={session?.contact ?? null}
             recent={recent}
             onAddressChange={setAddress}
-            onComp={() => setConfirmOpen(true)}
+            onComp={() => runComp({ address })}
             onOpenRecent={openSnapshot}
             onViewAll={() => (window.location.href = '/history')}
           />
@@ -240,13 +237,6 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
           />
         )}
       </div>
-
-      <ConfirmModal
-        open={confirmOpen}
-        address={address}
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => runComp({ address })}
-      />
 
       {toast && <Toast toast={toast} />}
     </Shell>

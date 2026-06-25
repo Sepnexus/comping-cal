@@ -111,7 +111,7 @@ export function ResultPanel({
               <Icon path={ic.clock} size={13} width={2} /> Snapshot {dateShort(snapshot.takenAt)}
             </span>
             <button onClick={onRefresh} style={hdrBtn}>
-              <Icon path={ic.refresh} size={14} width={2} /> Refresh <span style={{ color: 'var(--muted)', fontWeight: 500 }}>· 1 use</span>
+              <Icon path={ic.refresh} size={14} width={2} /> Refresh
             </button>
             <a href={p.shareLink} target="_blank" rel="noreferrer" style={{ ...hdrBtn, textDecoration: 'none' }}>
               <Icon path={ic.share} size={14} width={2} /> Share
@@ -121,7 +121,7 @@ export function ResultPanel({
 
         {snapshot.stale && (
           <div style={{ padding: '10px 13px', borderRadius: 11, background: 'var(--amber-soft)', color: 'var(--amber)', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, animation: 'fadeUp .4s ease both' }}>
-            <Icon path={ic.warn} size={15} width={2} /> Data as of {dateShort(snapshot.takenAt)} — comps may have changed. Refresh to re-pull (1 use). We never auto-refresh.
+            <Icon path={ic.warn} size={15} width={2} /> Data as of {dateShort(snapshot.takenAt)} — comps may have changed. Refresh to re-pull. We never auto-refresh.
           </div>
         )}
 
@@ -550,11 +550,11 @@ function RepairsChat({ snapshot, onRepairs }: { snapshot: PublicSnapshot; onRepa
             placeholder="Describe condition…"
             style={{ flex: 1, border: 'none', background: 'none', color: 'var(--text)', fontSize: 13 }}
           />
-          <button onClick={() => send()} disabled={busy || !text.trim()} title="Generate estimate · 1 use" style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', cursor: busy || !text.trim() ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy || !text.trim() ? 0.6 : 1 }}>
+          <button onClick={() => send()} disabled={busy || !text.trim()} title="Generate estimate" style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', cursor: busy || !text.trim() ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy || !text.trim() ? 0.6 : 1 }}>
             <Icon path={ic.send} size={15} width={2} />
           </button>
         </div>
-        <p style={{ margin: '8px 2px 0', fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>Generate estimate · 1 use · charged on success only</p>
+        <p style={{ margin: '8px 2px 0', fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>Describe the condition, then generate an itemized estimate.</p>
       </div>
     </div>
   );
