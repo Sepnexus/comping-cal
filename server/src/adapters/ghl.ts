@@ -21,7 +21,10 @@ export interface GhlContact {
   notes?: string;
 }
 
-const live = () => settings.ghlMode() === 'live';
+/** The Sandbox test location — the only location allowed to run comps for free
+ *  when no real billing endpoint is configured. Every other location must charge. */
+export const TEST_SANDBOX_GHL_ID = 'loc_test01';
+
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const key = settings.ghlApiKey();
   return { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}), ...extra };
@@ -54,7 +57,7 @@ function mapContact(raw: any, contactId: string): GhlContact {
 }
 
 export async function fetchContact(ghlLocationId: string, contactId: string): Promise<GhlContact | null> {
-  if (live() && settings.ghlContactUrl()) {
+  if (settings.ghlContactUrl()) {
     try {
       const url = new URL(settings.ghlContactUrl());
       url.searchParams.set('locationId', ghlLocationId);
@@ -130,9 +133,10 @@ export async function chargeWallet(
   idempotencyKey: string,
   contactId?: string,
 ): Promise<WalletChargeResult> {
-  if (live() && settings.ghlChargeUrl()) {
+  const chargeUrl = settings.ghlChargeUrl();
+  if (chargeUrl) {
     try {
-      const url = new URL(settings.ghlChargeUrl());
+      const url = new URL(chargeUrl);
       url.searchParams.set('locationId', ghlLocationId);
       if (contactId) url.searchParams.set('contactId', contactId);
       const res = await fetch(url, { method: 'POST', headers: authHeaders({ 'idempotency-key': idempotencyKey }) });
@@ -146,12 +150,14 @@ export async function chargeWallet(
       const reason = headerMsg || body || (res.status === 402 ? 'Insufficient wallet balance' : `charge_failed_${res.status}`);
       return { ok: false, reason };
     } catch (e) {
-      return { ok: false, reason: 'charge_endpoint_unreachable' };
+      // Endpoint unreachable → fail CLOSED (never hand out a free paid comp).
+      return { ok: false, reason: 'Billing service is temporarily unreachable. Please try again.' };
     }
   }
-  // mock
-  if (/failwallet|empty/.test(ghlLocationId)) return { ok: false, reason: 'Insufficient wallet balance' };
-  return { ok: true, transactionId: 'wtx_' + idempotencyKey.slice(0, 12) };
+  // No charge endpoint configured. The Sandbox test location runs free; every other
+  // location is blocked so a misconfiguration can never give away free comps.
+  if (ghlLocationId === TEST_SANDBOX_GHL_ID) return { ok: true, transactionId: 'sandbox_' + idempotencyKey.slice(0, 10) };
+  return { ok: false, reason: 'Billing isn’t set up for this location yet. Please contact your administrator.' };
 }
 
 // ── Write-back ───────────────────────────────────────────────────────────────
@@ -163,7 +169,7 @@ export async function writeBackContact(
   contactId: string,
   fields: Record<string, number | string>,
 ): Promise<WritebackResult> {
-  if (live() && settings.ghlWritebackUrl()) {
+  if (settings.ghlWritebackUrl()) {
     try {
       const res = await fetch(settings.ghlWritebackUrl(), {
         method: 'POST',
