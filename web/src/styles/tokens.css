@@ -1,0 +1,253 @@
+/* Design tokens — copied verbatim from the Closer Control "Comps Platform"
+   design comp so the build matches the system 1:1. Sage-green brand, light/dark. */
+:root {
+  --bg: #f3f5ef;
+  --surface: #ffffff;
+  --surface2: #f8faf5;
+  --surface3: #edf1e6;
+  --border: #e3e8dc;
+  --border2: #d3dac9;
+  --text: #191d15;
+  --text2: #59614f;
+  --muted: #8b927e;
+  --brand: #4c7a3c;
+  --brand2: #3e6730;
+  --brand-soft: #e9f1e2;
+  --brand-ink: #ffffff;
+  --amber: #b7791f;
+  --amber-soft: #f6ebd3;
+  --red: #c0492f;
+  --red-soft: #f7e1db;
+  --blue: #3a6fa8;
+  --blue-soft: #e0eaf5;
+  --shadow: 0 1px 2px rgba(20, 30, 15, 0.05), 0 10px 30px -16px rgba(20, 30, 15, 0.18);
+  --shadow-lg: 0 2px 6px rgba(20, 30, 15, 0.06), 0 28px 60px -22px rgba(20, 30, 15, 0.3);
+}
+[data-theme='dark'] {
+  --bg: #0d110b;
+  --surface: #151a12;
+  --surface2: #1a2016;
+  --surface3: #232c1c;
+  --border: #28321f;
+  --border2: #37432c;
+  --text: #ecf0e6;
+  --text2: #a6b098;
+  --muted: #737d66;
+  --brand: #79b257;
+  --brand2: #8ac568;
+  --brand-soft: #1e2a16;
+  --brand-ink: #0c0f09;
+  --amber: #d9a441;
+  --amber-soft: #2a2413;
+  --red: #e2745a;
+  --red-soft: #2e1813;
+  --blue: #6ba3d8;
+  --blue-soft: #142231;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -16px rgba(0, 0, 0, 0.65);
+  --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.5), 0 34px 70px -24px rgba(0, 0, 0, 0.8);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+#root {
+  min-height: 100vh;
+}
+::selection {
+  background: var(--brand);
+  color: #fff;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: content-box;
+}
+input,
+button,
+textarea {
+  font-family: inherit;
+}
+input:focus,
+textarea:focus {
+  outline: none;
+}
+button {
+  font-family: inherit;
+}
+a {
+  color: inherit;
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes streamIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes growW {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes floatPin {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -100%) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+  }
+}
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 122, 60, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(76, 122, 60, 0.1);
+  }
+}
+@keyframes slideInDrawer {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.sk {
+  background: linear-gradient(90deg, var(--surface3) 8%, var(--surface2) 28%, var(--surface3) 42%);
+  background-size: 240% 100%;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: 8px;
+}
+.mono {
+  font-family: 'Geist Mono', monospace;
+}
+
+/* Leaflet map theming so the real OSM map matches the design system. */
+.leaflet-container {
+  font-family: inherit;
+  background: var(--surface3);
+}
+.leaflet-control-attribution {
+  font-size: 9px !important;
+}
+.cc-map-dark .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95);
+}
+.cc-map-dark .leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.55) !important;
+  color: #9aa68c !important;
+}
+.cc-pin {
+  background: var(--brand);
+  color: #fff;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 22px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 13px 13px 13px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.35);
+  border: 2px solid #fff;
+}
+.cc-pin-subject {
+  background: #d83a34;
+}
+.cc-pin-muted {
+  background: #7c8576;
+}

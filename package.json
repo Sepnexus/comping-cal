@@ -1,0 +1,21 @@
+{
+  "name": "bricked-comping",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bricked Comping Tool for GoHighLevel — embedded AI property comping, ARV/CMV & repair estimates, scoped per sub-account and billed to the GHL wallet.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c green,cyan \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "seed": "npm run seed -w server",
+    "build": "npm run build -w web",
+    "start": "npm run start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

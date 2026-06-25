@@ -1,0 +1,43 @@
+# One container serving the API and the built React UI together.
+# Host 8088 → container 8787 (avoids clashing with a local `npm run dev`).
+# Open http://localhost:8088
+services:
+  app:
+    build: .
+    image: bricked-comping
+    container_name: bricked-comping
+    ports:
+      - "8088:8787"
+    environment:
+      PORT: "8787"
+      # v1 auth + admin secrets (override for anything real).
+      HMAC_SECRET: "dev-hmac-secret-change-me"
+      ADMIN_JWT_SECRET: "dev-admin-jwt-secret-change-me"
+      # Adapters: read from .env (gitignored) so secrets stay out of this file.
+      # Defaults keep it in mock mode if .env is absent.
+      BRICKED_MODE: "${BRICKED_MODE:-mock}"
+      BRICKED_API_KEY: "${BRICKED_API_KEY:-}"
+      BRICKED_BASE_URL: "${BRICKED_BASE_URL:-https://api.bricked.ai}"
+      # GHL custom-JS button model: contact/charge/write-back hit the agency endpoints.
+      GHL_MODE: "${GHL_MODE:-mock}"
+      GHL_CONTACT_URL: "${GHL_CONTACT_URL:-}"
+      GHL_CHARGE_URL: "${GHL_CHARGE_URL:-}"
+      GHL_WRITEBACK_URL: "${GHL_WRITEBACK_URL:-}"
+      GHL_API_KEY: "${GHL_API_KEY:-}"
+      # Shared launch password baked into the GHL contact button.
+      LAUNCH_PASSWORD: "${LAUNCH_PASSWORD:-}"
+      TOOL_PUBLIC_URL: "${TOOL_PUBLIC_URL:-}"
+      # Pricing / margin defaults (FRD §6.4).
+      DEFAULT_PER_COMP_PRICE: "0.65"
+      DEFAULT_BRICKED_COST: "0.33"
+      GLOBAL_COST_CEILING: "300"
+      # Onboarding: auto-register a new sub-account on its first valid launch.
+      AUTO_PROVISION_LOCATIONS: "${AUTO_PROVISION_LOCATIONS:-true}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-}"
+    volumes:
+      # Persist the SQLite database across restarts.
+      - comping-data:/app/server/data
+    restart: unless-stopped
+
+volumes:
+  comping-data:
