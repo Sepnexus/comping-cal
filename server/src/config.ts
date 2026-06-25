@@ -19,9 +19,8 @@ export const config = {
   hmacSecret: process.env.HMAC_SECRET ?? 'dev-hmac-secret-change-me',
   adminJwtSecret: process.env.ADMIN_JWT_SECRET ?? 'dev-admin-jwt-secret-change-me',
 
-  // Bricked adapter (FRD §5)
+  // Bricked adapter (FRD §5) — always live; the key is admin-managed.
   bricked: {
-    mode: (process.env.BRICKED_MODE ?? 'mock') as 'mock' | 'live',
     apiKey: process.env.BRICKED_API_KEY ?? '',
     baseUrl: process.env.BRICKED_BASE_URL ?? 'https://api.bricked.ai',
   },
@@ -31,7 +30,6 @@ export const config = {
   // a shared launch password. Contact fetch, the per-comp charge, and write-back
   // all hit the agency's own endpoints (these return success/failed + reason).
   ghl: {
-    mode: (process.env.GHL_MODE ?? 'mock') as 'mock' | 'live',
     // Endpoints supplied by Closer Control / their GHL+KNL backend:
     contactUrl: process.env.GHL_CONTACT_URL ?? '', // GET contact (name, address, …) by contactId
     locationUrl: process.env.GHL_LOCATION_URL ?? '', // GET location name by locationId → authorization gate

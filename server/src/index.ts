@@ -16,12 +16,12 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (_req, res) =>
-  res.json({ ok: true, service: 'bricked-comping', brickedMode: settings.brickedMode(), ghlMode: settings.ghlMode() }),
+  res.json({ ok: true, service: 'bricked-comping', charge: settings.ghlChargeUrl() ? 'configured' : 'not_configured' }),
 );
 
 app.use('/api', toolRouter); // tool endpoints (FRD §9)
 app.use('/api/admin', adminRouter); // admin oversight (FRD §7.7)
-app.use('/api/dev', devRouter); // local launch bootstrap (mock mode only)
+app.use('/api/dev', devRouter); // local launch bootstrap (disabled in production)
 
 // Unmatched API routes → neutral JSON 404 (scoped to /api so the SPA fallback below
 // can own every other path).
@@ -43,5 +43,5 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 app.listen(config.port, () => {
   console.log(`▸ Bricked Comping API on http://localhost:${config.port}`);
-  console.log(`  Bricked: ${settings.brickedMode()} · GHL: ${settings.ghlMode()}`);
+  console.log(`  Bricked key: ${settings.brickedApiKey() ? 'set' : 'MISSING'} · Charge endpoint: ${settings.ghlChargeUrl() ? 'configured' : 'NOT configured'}`);
 });

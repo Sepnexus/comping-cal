@@ -14,13 +14,12 @@ services:
       HMAC_SECRET: "dev-hmac-secret-change-me"
       ADMIN_JWT_SECRET: "dev-admin-jwt-secret-change-me"
       # Adapters: read from .env (gitignored) so secrets stay out of this file.
-      # Defaults keep it in mock mode if .env is absent.
-      BRICKED_MODE: "${BRICKED_MODE:-mock}"
+      # Live-only — a Bricked key is required to run comps.
       BRICKED_API_KEY: "${BRICKED_API_KEY:-}"
       BRICKED_BASE_URL: "${BRICKED_BASE_URL:-https://api.bricked.ai}"
       # GHL custom-JS button model: contact/charge/write-back hit the agency endpoints.
-      GHL_MODE: "${GHL_MODE:-mock}"
       GHL_CONTACT_URL: "${GHL_CONTACT_URL:-}"
+      GHL_LOCATION_URL: "${GHL_LOCATION_URL:-}"
       GHL_CHARGE_URL: "${GHL_CHARGE_URL:-}"
       GHL_WRITEBACK_URL: "${GHL_WRITEBACK_URL:-}"
       GHL_API_KEY: "${GHL_API_KEY:-}"

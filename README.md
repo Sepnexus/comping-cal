@@ -63,9 +63,9 @@ docker compose down -v              # stop and wipe the seeded database
 
 Host **8088** maps to the container's 8787 so it won't clash with a local
 `npm run dev`. Admin panel: http://localhost:8088/admin/login. Configuration
-(secrets, `BRICKED_MODE` / `GHL_MODE`, pricing) is set via the `environment:`
-block in `docker-compose.yml` — flip the modes to `live` and add keys there to run
-against real Bricked / GHL.
+(secrets, Bricked key, GHL endpoints, pricing) is set via the `environment:`
+block in `docker-compose.yml` or in Admin → Settings. The tool is live-only —
+add the Bricked key and the GHL charge endpoint to run against real Bricked / GHL.
 
 ---
 
@@ -178,14 +178,13 @@ It parses `locationId` + `contactId` from the GHL URL and opens
 **2. Point the server at your endpoints.** Edit `.env`:
 
 ```bash
-BRICKED_MODE=live
 BRICKED_API_KEY=...                  # x-api-key, server-side only
 
-GHL_MODE=live
 GHL_CONTACT_URL=https://your-api/...    # GET  contact by ?locationId=&contactId=
-GHL_CHARGE_URL=https://your-api/...     # POST per-comp charge → {status, reason}
+GHL_LOCATION_URL=https://your-api/...   # GET  location name by ?locationId= (auth gate)
+GHL_CHARGE_URL=https://your-api/...     # POST per-comp charge → 200 charged · 402 declined
 GHL_WRITEBACK_URL=https://your-api/...  # POST {locationId, contactId, fields}
-GHL_API_KEY=...                          # sent as x-api-key on the three calls
+GHL_API_KEY=...                          # sent as x-api-key on the calls above
 LAUNCH_PASSWORD=your-shared-launch-secret
 TOOL_PUBLIC_URL=https://comps.yourdomain.com
 ```

@@ -240,11 +240,9 @@ function settingsPayload() {
     globalCostCeiling: eff.globalCostCeiling,
     compLookback: eff.compLookback,
     // bricked
-    brickedMode: settings.brickedMode(),
     brickedKeySet: !!brickedKey,
     brickedKeyMasked: mask(brickedKey),
     // ghl
-    ghlMode: settings.ghlMode(),
     ghlContactUrl: settings.ghlContactUrl(),
     ghlLocationUrl: settings.ghlLocationUrl(),
     ghlChargeUrl: settings.ghlChargeUrl(),
@@ -315,9 +313,7 @@ adminRouter.patch('/settings', requireAdmin, (req, res) => {
   // Integration: modes/URLs/launch password update when provided; API keys only when
   // a real new value is given (so saving without retyping never wipes a key).
   settings.updateIntegration({
-    brickedMode: body.brickedMode,
     brickedApiKey: body.brickedApiKey,
-    ghlMode: body.ghlMode,
     ghlContactUrl: body.ghlContactUrl,
     ghlLocationUrl: body.ghlLocationUrl,
     ghlChargeUrl: body.ghlChargeUrl,

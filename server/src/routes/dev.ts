@@ -1,27 +1,25 @@
 import { Router } from 'express';
-import { settings } from '../db/settings.js';
 import { locations } from '../db/repos.js';
 import { launchTokenFor } from '../util/crypto.js';
 
 /**
  * Dev-only bootstrap. In production the per-location token is baked into the GHL
  * button URL (FRD §4.1); locally we expose it so the embedded tool can launch a
- * verified session without GHL present. Disabled when GHL_MODE=live.
+ * verified session without GHL present. Fully disabled in production.
  */
 export const devRouter = Router();
+const disabledInProd = () => process.env.NODE_ENV === 'production';
 
 devRouter.get('/launch-context', (req, res) => {
-  if (settings.ghlMode() === 'live') {
-    res.status(404).json({ ok: false, error: 'disabled_in_live' });
+  if (disabledInProd()) {
+    res.status(404).json({ ok: false, error: 'disabled_in_production' });
     return;
   }
   const ghlLocationId = String(req.query.locationId ?? '');
   // Use a specific location if asked; otherwise the first active one (the test
   // location after a clean seed). This route is a local convenience only — in
   // production the token + locationId arrive in the GHL button / SSO launch URL.
-  const loc = ghlLocationId
-    ? locations.byGhlId(ghlLocationId)
-    : locations.all().find((l) => l.status === 'active' && !/failwallet|empty/.test(l.ghl_location_id));
+  const loc = ghlLocationId ? locations.byGhlId(ghlLocationId) : locations.all().find((l) => l.status === 'active');
   if (!loc) {
     res.status(404).json({ ok: false, error: 'no_location' });
     return;
@@ -36,9 +34,9 @@ devRouter.get('/launch-context', (req, res) => {
   });
 });
 
-devRouter.get('/locations', (req, res) => {
-  if (settings.ghlMode() === 'live') {
-    res.status(404).json({ ok: false, error: 'disabled_in_live' });
+devRouter.get('/locations', (_req, res) => {
+  if (disabledInProd()) {
+    res.status(404).json({ ok: false, error: 'disabled_in_production' });
     return;
   }
   res.json({

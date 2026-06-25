@@ -19,11 +19,8 @@ services:
     environment:
       PORT: '8787'
       NODE_ENV: production
-      # Production defaults (used only when no Admin → Settings value is saved).
-      # Charging keys off the charge URL being present, so this makes a fresh deploy
-      # bill for real instead of silently faking it. Admin settings still override.
-      BRICKED_MODE: live
-      GHL_MODE: live
+      # Charge endpoint default (used only when no Admin → Settings value is saved).
+      # Live-only: comps are blocked unless this charges successfully. Admin overrides.
       GHL_CHARGE_URL: https://n8n.srv844822.hstgr.cloud/webhook/payment
       # Set once your location-name workflow is live (authorization gate):
       # GHL_LOCATION_URL: https://n8n.srv844822.hstgr.cloud/webhook/<location-path>

@@ -7,10 +7,8 @@ interface Settings {
   brickedCost: number;
   globalCostCeiling: number;
   compLookback: number;
-  brickedMode: 'mock' | 'live';
   brickedKeySet: boolean;
   brickedKeyMasked: string;
-  ghlMode: 'mock' | 'live';
   ghlContactUrl: string;
   ghlLocationUrl: string;
   ghlChargeUrl: string;
@@ -26,9 +24,7 @@ interface Form {
   brickedCost: string;
   globalCostCeiling: string;
   compLookback: string;
-  brickedMode: 'mock' | 'live';
   brickedApiKey: string; // empty = keep existing
-  ghlMode: 'mock' | 'live';
   ghlContactUrl: string;
   ghlLocationUrl: string;
   ghlChargeUrl: string;
@@ -80,9 +76,7 @@ export function AdminSettings() {
       brickedCost: String(r.settings.brickedCost),
       globalCostCeiling: String(r.settings.globalCostCeiling),
       compLookback: String(r.settings.compLookback ?? 12),
-      brickedMode: r.settings.brickedMode,
       brickedApiKey: '', // never prefilled — masked on the server
-      ghlMode: r.settings.ghlMode,
       ghlContactUrl: r.settings.ghlContactUrl ?? '',
       ghlLocationUrl: r.settings.ghlLocationUrl ?? '',
       ghlChargeUrl: r.settings.ghlChargeUrl ?? '',
@@ -128,9 +122,7 @@ export function AdminSettings() {
     try {
       const r = await adminApi.updateSettings({
         ...nums,
-        brickedMode: form.brickedMode,
         brickedApiKey: form.brickedApiKey, // empty → server keeps existing
-        ghlMode: form.ghlMode,
         ghlContactUrl: form.ghlContactUrl,
         ghlLocationUrl: form.ghlLocationUrl,
         ghlChargeUrl: form.ghlChargeUrl,
@@ -174,7 +166,7 @@ export function AdminSettings() {
         <>
           {/* Bricked */}
           <div style={cardBase}>
-            <CardHead title="Bricked (valuation API)" mode={form.brickedMode} onMode={(m) => set('brickedMode', m)} />
+            <CardHead title="Bricked (valuation API)" />
             <SecretField
               label="Bricked API key"
               isSet={s.brickedKeySet}
@@ -182,12 +174,12 @@ export function AdminSettings() {
               value={form.brickedApiKey}
               onChange={(v) => set('brickedApiKey', v)}
             />
-            <Hint>Live mode requires a key. Leave blank to keep the current one.</Hint>
+            <Hint>A Bricked API key is required to run comps. Leave blank to keep the current one.</Hint>
           </div>
 
           {/* GHL */}
           <div style={cardBase}>
-            <CardHead title="GoHighLevel endpoints" mode={form.ghlMode} onMode={(m) => set('ghlMode', m)} />
+            <CardHead title="GoHighLevel endpoints" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <TextField label="Contact endpoint (GET)" placeholder="https://…/contact" value={form.ghlContactUrl} onChange={(v) => set('ghlContactUrl', v)} />
               <TextField label="Location-name endpoint (GET) — authorization gate" placeholder="https://…/webhook/location" value={form.ghlLocationUrl} onChange={(v) => set('ghlLocationUrl', v)} />
@@ -195,7 +187,7 @@ export function AdminSettings() {
               <TextField label="Write-back endpoint (POST)" placeholder="https://…/writeback" value={form.ghlWritebackUrl} onChange={(v) => set('ghlWritebackUrl', v)} />
               <SecretField label="GHL API key (x-api-key)" isSet={s.ghlKeySet} masked={s.ghlKeyMasked} value={form.ghlApiKey} onChange={(v) => set('ghlApiKey', v)} />
             </div>
-            <Hint>Live mode uses these. Empty endpoints fall back to mock so the tool still runs. The location-name endpoint authorizes new locations: it must return a <code style={{ fontFamily: 'Geist Mono' }}>name</code> for entitled locations and a non-200 for everyone else.</Hint>
+            <Hint>These power live billing and contact sync. <strong>Charging requires the Charge endpoint</strong> — without it every comp is blocked (no free comps). The location-name endpoint authorizes new locations: it must return a <code style={{ fontFamily: 'Geist Mono' }}>name</code> for entitled locations and a non-200 for everyone else.</Hint>
           </div>
 
           {/* Launch password */}
@@ -265,32 +257,11 @@ export function AdminSettings() {
   );
 }
 
-function CardHead({ title, mode, onMode }: { title: string; mode: 'mock' | 'live'; onMode: (m: 'mock' | 'live') => void }) {
+function CardHead({ title }: { title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
       <div style={{ fontWeight: 700, fontSize: 14 }}>{title}</div>
-      <div style={{ display: 'flex', background: 'var(--surface3)', borderRadius: 8, padding: 3, gap: 2 }}>
-        {(['mock', 'live'] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => onMode(m)}
-            style={{
-              padding: '5px 13px',
-              borderRadius: 6,
-              border: 'none',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              background: mode === m ? 'var(--surface)' : 'transparent',
-              color: mode === m ? (m === 'live' ? 'var(--brand)' : 'var(--text)') : 'var(--text2)',
-              boxShadow: mode === m ? 'var(--shadow)' : 'none',
-            }}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
+      <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--brand)', background: 'var(--brand-soft)', padding: '3px 9px', borderRadius: 20 }}>live</span>
     </div>
   );
 }
