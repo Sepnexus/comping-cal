@@ -1,0 +1,42 @@
+# Production deploy for the Hostinger VPS (srv844822) behind Traefik.
+#
+# One container serves the API + the React SPA on :8787. Traefik terminates HTTPS
+# and routes ${PUBLIC_HOST} to it over the shared `root_default` network — no host
+# port is published. Same pattern as the iBuyKC dashboard.
+#
+#   docker compose -f docker-compose.vps.yml up -d --build
+#
+# Requires: Traefik already running on `root_default` with certresolver
+# `mytlschallenge`, and DNS for ${PUBLIC_HOST} pointed at the VPS IP.
+services:
+  comping:
+    build: .
+    image: comping-cal:latest
+    container_name: comping-cal
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: '8787'
+      NODE_ENV: production
+    volumes:
+      # SQLite database persists across rebuilds.
+      - comping-data:/app/server/data
+    networks:
+      - root_default
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=root_default'
+      - 'traefik.http.routers.comping.rule=Host(`${PUBLIC_HOST}`)'
+      - 'traefik.http.routers.comping.entrypoints=web,websecure'
+      - 'traefik.http.routers.comping.tls=true'
+      - 'traefik.http.routers.comping.tls.certresolver=mytlschallenge'
+      - 'traefik.http.routers.comping.service=comping-svc'
+      - 'traefik.http.services.comping-svc.loadbalancer.server.port=8787'
+
+volumes:
+  comping-data:
+
+networks:
+  root_default:
+    external: true
