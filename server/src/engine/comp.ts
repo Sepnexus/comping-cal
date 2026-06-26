@@ -28,6 +28,7 @@ export interface PublicSnapshot {
   id: string;
   locationId: string;
   ghlContactId: string | null;
+  contactName: string | null;
   address: string;
   version: number;
   brickedPropertyId: string | null;
@@ -57,6 +58,7 @@ export function toPublicSnapshot(row: SnapshotRow): PublicSnapshot {
     id: row.id,
     locationId: row.location_id,
     ghlContactId: row.ghl_contact_id,
+    contactName: row.ghl_contact_name ?? null,
     address: property.subject.address,
     version: row.version,
     brickedPropertyId: row.bricked_property_id,
@@ -104,6 +106,7 @@ function fallbackFor(status: number): { kind: string; message: string } {
 export interface RunCompInput {
   locationId: string; // internal location.id
   ghlContactId?: string | null;
+  ghlContactName?: string | null;
   address: string;
   refresh?: boolean;
   overrides?: Partial<CreatePropertyParams>;
@@ -213,6 +216,7 @@ export async function runComp(input: RunCompInput): Promise<CompOutcome> {
   const snap = snapshots.insert({
     location_id: loc.id,
     ghl_contact_id: input.ghlContactId ?? null,
+    ghl_contact_name: input.ghlContactName ?? null,
     normalized_address: normalized,
     version,
     bricked_property_id: p.id,

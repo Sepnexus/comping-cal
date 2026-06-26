@@ -68,7 +68,7 @@ toolRouter.post('/session/verify', requireLocation, async (req, res) => {
  */
 toolRouter.post('/comp', requireLocation, async (req, res) => {
   const loc = req.location!;
-  const { contactId, address, refresh, overrides } = req.body ?? {};
+  const { contactId, contactName, address, refresh, overrides } = req.body ?? {};
   if (!address || !String(address).trim()) {
     res.status(422).json({ ok: false, error: 'address_missing', message: 'Enter an address to comp.' });
     return;
@@ -76,6 +76,7 @@ toolRouter.post('/comp', requireLocation, async (req, res) => {
   const outcome = await runComp({
     locationId: loc.id,
     ghlContactId: contactId ?? null,
+    ghlContactName: contactName ? String(contactName).trim() : null,
     address: String(address),
     refresh: !!refresh,
     overrides: overrides ?? undefined,
@@ -127,6 +128,7 @@ toolRouter.get('/history', requireLocation, (req, res) => {
     return {
       id: p.id,
       address: p.address,
+      contactName: p.contactName,
       arv: p.arv,
       totalRepairCost: p.totalRepairCost,
       takenAt: p.takenAt,

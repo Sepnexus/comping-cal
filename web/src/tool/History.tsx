@@ -89,6 +89,7 @@ export function History({ onOpen, ready = true }: { onOpen: (id: string) => void
             <thead>
               <tr style={{ color: 'var(--muted)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.5px', background: 'var(--surface2)' }}>
                 <th style={th()}>Address</th>
+                <th style={th(10)}>Contact</th>
                 <th style={th(10)}>Comped</th>
                 <th style={th(10, 'right')}>ARV</th>
                 <th style={th(10, 'right')}>Repairs</th>
@@ -107,6 +108,7 @@ export function History({ onOpen, ready = true }: { onOpen: (id: string) => void
                         <span style={{ fontWeight: 600 }}>{r.address}</span>
                       </div>
                     </td>
+                    <td style={{ padding: '13px 10px', color: r.contactName ? 'var(--text)' : 'var(--muted)' }}>{r.contactName || '—'}</td>
                     <td style={{ padding: '13px 10px', fontFamily: 'Geist Mono', color: 'var(--text2)' }}>{dateMonthDay(r.takenAt)}</td>
                     <td style={{ padding: '13px 10px', textAlign: 'right', fontFamily: 'Geist Mono', fontWeight: 600, color: 'var(--brand)' }}>{moneyK(r.arv)}</td>
                     <td style={{ padding: '13px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--text2)' }}>{r.totalRepairCost ? moneyK(r.totalRepairCost) : '—'}</td>

@@ -17,6 +17,7 @@ export interface SnapshotRow {
   id: string;
   location_id: string;
   ghl_contact_id: string | null;
+  ghl_contact_name: string | null;
   normalized_address: string;
   version: number;
   bricked_property_id: string | null;
@@ -122,14 +123,16 @@ export const snapshots = {
       )
       .all(locationId, locationId) as SnapshotRow[];
   },
-  insert(row: Omit<SnapshotRow, 'id' | 'taken_at'> & { id?: string; taken_at?: string }): SnapshotRow {
+  insert(
+    row: Omit<SnapshotRow, 'id' | 'taken_at' | 'ghl_contact_name'> & { ghl_contact_name?: string | null; id?: string; taken_at?: string },
+  ): SnapshotRow {
     const id = row.id ?? uuid();
     db.prepare(
       `INSERT INTO property_snapshot
-        (id, location_id, ghl_contact_id, normalized_address, version, bricked_property_id, raw_json, arv, cmv, total_repair_cost, taken_at)
-       VALUES (@id, @location_id, @ghl_contact_id, @normalized_address, @version, @bricked_property_id, @raw_json, @arv, @cmv, @total_repair_cost,
+        (id, location_id, ghl_contact_id, ghl_contact_name, normalized_address, version, bricked_property_id, raw_json, arv, cmv, total_repair_cost, taken_at)
+       VALUES (@id, @location_id, @ghl_contact_id, @ghl_contact_name, @normalized_address, @version, @bricked_property_id, @raw_json, @arv, @cmv, @total_repair_cost,
                COALESCE(@taken_at, strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
-    ).run({ ...row, id, taken_at: row.taken_at ?? null });
+    ).run({ ...row, id, ghl_contact_name: row.ghl_contact_name ?? null, taken_at: row.taken_at ?? null });
     return snapshots.byId(id)!;
   },
   updateRepairs(id: string, raw_json: string, total_repair_cost: number): SnapshotRow | undefined {

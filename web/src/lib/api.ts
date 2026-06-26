@@ -82,7 +82,7 @@ export const toolApi = {
   setLocationName(opts: { name: string }): Promise<{ ok: true; name: string }> {
     return post('/location/name', opts);
   },
-  async comp(opts: { address: string; refresh?: boolean; overrides?: Record<string, unknown> }): Promise<{
+  async comp(opts: { address: string; contactName?: string; refresh?: boolean; overrides?: Record<string, unknown> }): Promise<{
     ok: true;
     charged: boolean;
     chargeStatus: string;

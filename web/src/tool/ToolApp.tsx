@@ -136,7 +136,8 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
       setFallback(null);
       runningCount.current = 8 + Math.floor(Math.random() * 12);
       try {
-        const res = await toolApi.comp(opts);
+        const name = contactName && contactName !== '…' ? contactName : undefined;
+        const res = await toolApi.comp({ ...opts, contactName: name });
         setSnapshot(res.snapshot);
         setWs('result');
         if (res.charged) flashToast({ kind: 'charged', msg: 'Comp complete' });
@@ -155,7 +156,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
         setWs('error');
       }
     },
-    [flashToast],
+    [flashToast, contactName],
   );
 
   const refresh = useCallback(() => {

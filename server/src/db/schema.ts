@@ -91,4 +91,10 @@ export function applySchema(db: Database.Database): void {
     created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   );
   `);
+
+  // ── Idempotent migrations for columns added after the initial release ──
+  const snapCols = db.prepare('PRAGMA table_info(property_snapshot)').all() as { name: string }[];
+  if (!snapCols.some((c) => c.name === 'ghl_contact_name')) {
+    db.exec('ALTER TABLE property_snapshot ADD COLUMN ghl_contact_name TEXT');
+  }
 }

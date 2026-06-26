@@ -121,6 +121,7 @@ export interface PublicSnapshot {
   id: string;
   locationId: string;
   ghlContactId: string | null;
+  contactName: string | null;
   address: string;
   version: number;
   brickedPropertyId: string | null;
@@ -148,6 +149,7 @@ export interface SessionInfo {
 export interface HistoryItem {
   id: string;
   address: string;
+  contactName: string | null;
   arv: number | null;
   totalRepairCost: number | null;
   takenAt: string;
