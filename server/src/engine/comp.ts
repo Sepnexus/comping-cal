@@ -163,58 +163,52 @@ export async function runComp(input: RunCompInput): Promise<CompOutcome> {
       };
   }
 
-  // CHARGE FIRST — gate the customer's wallet before spending on Bricked. If the
-  // charge is declined we stop here: no Bricked call, no snapshot, no analytics.
-  // (A prior idempotent attempt that already charged but failed at Bricked is not
-  //  re-charged — we skip straight to re-pulling Bricked.)
-  const price = perCompPrice(loc);
-  const priorCharged = !!(prior && prior.charge_status === 'charged');
-  const charge = priorCharged
-    ? ({ ok: true } as const)
-    : await chargeWallet(loc.ghl_location_id, price, idemKey, input.ghlContactId ?? undefined);
-
-  if (!charge.ok) {
-    // Declined (e.g. insufficient wallet balance) → billing-issue gate, no Bricked call.
-    usage.insert({
-      location_id: loc.id,
-      snapshot_id: null,
-      type: isRefresh ? 'refresh' : 'comp',
-      bricked_status: null,
-      bricked_cost: null,
-      charged_amount: 0,
-      charge_status: 'charge_failed',
-      free_reason: charge.reason,
-      address: input.address,
-      idempotency_key: null, // no charge → free retry once the wallet is funded
-    });
-    return { ok: false, status: 402, charged: false, chargeStatus: 'charge_failed', billingIssue: true, fallback: { kind: 'billing_issue', message: 'Insufficient wallet balance — please top up to run a comp.', reason: charge.reason } };
-  }
-
-  // Charge cleared → now pull the valuation from Bricked.
+  // 1) Call Bricked FIRST. We only ever charge for a comp we can actually deliver,
+  //    so a Bricked failure (401/404/412/timeout) never touches the wallet.
   const params: CreatePropertyParams = { address: input.address, timeframe: settings.compLookback(), ...input.overrides };
   const result = await bricked.createProperty(params);
 
   if (!result.ok) {
-    // We charged but Bricked returned no usable data. Record it as a charged event
-    // (so revenue/logs stay accurate) keyed by idemKey, so a retry re-pulls Bricked
-    // without charging again. Rare for real contact addresses.
     usage.insert({
       location_id: loc.id,
       snapshot_id: null,
       type: isRefresh ? 'refresh' : 'comp',
       bricked_status: result.status,
       bricked_cost: null,
-      charged_amount: priorCharged ? 0 : price,
-      charge_status: 'charged',
-      free_reason: 'bricked_failed_after_charge',
+      charged_amount: 0,
+      charge_status: 'not_attempted',
+      free_reason: 'error_no_charge',
       address: input.address,
-      idempotency_key: priorCharged ? null : idemKey,
+      idempotency_key: null, // nothing charged → free retry until it succeeds once
     });
-    return { ok: false, status: result.status, charged: !priorCharged, chargeStatus: 'charged', fallback: fallbackFor(result.status) };
+    return { ok: false, status: result.status, charged: false, chargeStatus: 'not_attempted', fallback: fallbackFor(result.status) };
   }
 
-  // Charge + Bricked both cleared → store snapshot + log the charge. The snapshot is
-  // the universal-fallback anchor: once stored, the delivered valuation is never lost.
+  // 2) Bricked returned data → now charge the wallet. We wait for the charge result;
+  //    only an explicit HTTP 200 from the billing endpoint counts as charged.
+  const price = perCompPrice(loc);
+  const charge = await chargeWallet(loc.ghl_location_id, price, idemKey, input.ghlContactId ?? undefined);
+
+  if (!charge.ok) {
+    // Declined (insufficient balance, billing not set up, etc.) → no comp delivered,
+    // no snapshot. We absorbed one Bricked lookup; the customer is NOT charged.
+    usage.insert({
+      location_id: loc.id,
+      snapshot_id: null,
+      type: isRefresh ? 'refresh' : 'comp',
+      bricked_status: 200,
+      bricked_cost: settings.brickedCost(),
+      charged_amount: 0,
+      charge_status: 'charge_failed',
+      free_reason: charge.reason,
+      address: input.address,
+      idempotency_key: null, // no charge → free retry once billing is resolved
+    });
+    return { ok: false, status: 402, charged: false, chargeStatus: 'charge_failed', billingIssue: true, fallback: { kind: 'billing_issue', message: 'Insufficient wallet balance — please top up to run a comp.', reason: charge.reason } };
+  }
+
+  // 3) Bricked + charge both succeeded → store the snapshot and log the charge. A row
+  //    is only ever marked "charged" here, after a delivered comp.
   const p = result.property;
   const snap = snapshots.insert({
     location_id: loc.id,
@@ -233,13 +227,11 @@ export async function runComp(input: RunCompInput): Promise<CompOutcome> {
     type: isRefresh ? 'refresh' : 'comp',
     bricked_status: 200,
     bricked_cost: settings.brickedCost(),
-    // If this is a retry of an attempt that already charged (Bricked had failed),
-    // don't double-count revenue and don't reuse the claimed idempotency key.
-    charged_amount: priorCharged ? 0 : price,
+    charged_amount: price,
     charge_status: 'charged',
     free_reason: null,
     address: input.address,
-    idempotency_key: priorCharged ? null : idemKey,
+    idempotency_key: idemKey,
   });
   locations.touch(loc.id);
 
@@ -270,25 +262,7 @@ export async function generateRepairs(
     return { ok: true, status: 200, snapshot: toPublicSnapshot(snapshots.byId(snap.id)!), charged: true, chargeStatus: 'charged' };
   }
 
-  // Charge first — same wallet gate as a comp. Declined → no Bricked call.
-  const price = perCompPrice(loc);
-  const charge = await chargeWallet(loc.ghl_location_id, price, idemKey, snap.ghl_contact_id ?? undefined);
-  if (!charge.ok) {
-    usage.insert({
-      location_id: loc.id,
-      snapshot_id: snap.id,
-      type: 'repairs',
-      bricked_status: null,
-      bricked_cost: null,
-      charged_amount: 0,
-      charge_status: 'charge_failed',
-      free_reason: charge.reason,
-      address: property.subject.address,
-      idempotency_key: null, // no charge occurred — retry allowed after resolve
-    });
-    return { ok: false, status: 402, charged: false, chargeStatus: 'charge_failed', billingIssue: true, fallback: { kind: 'billing_issue', message: 'Insufficient wallet balance — please top up to generate an estimate.', reason: charge.reason } };
-  }
-
+  // Bricked first — only charge for an estimate we can actually deliver.
   const result = await bricked.createProperty({
     address: property.subject.address,
     squareFeet: property.subject.squareFeet ?? undefined,
@@ -297,20 +271,38 @@ export async function generateRepairs(
   });
 
   if (!result.ok) {
-    // Charged but Bricked failed — log as charged, keyed so a retry won't re-charge.
     usage.insert({
       location_id: loc.id,
       snapshot_id: snap.id,
       type: 'repairs',
       bricked_status: result.status,
       bricked_cost: null,
-      charged_amount: price,
-      charge_status: 'charged',
-      free_reason: 'bricked_failed_after_charge',
+      charged_amount: 0,
+      charge_status: 'not_attempted',
+      free_reason: 'error_no_charge',
       address: property.subject.address,
-      idempotency_key: idemKey,
+      idempotency_key: null,
     });
-    return { ok: false, status: result.status, charged: true, chargeStatus: 'charged', fallback: fallbackFor(result.status) };
+    return { ok: false, status: result.status, charged: false, chargeStatus: 'not_attempted', fallback: fallbackFor(result.status) };
+  }
+
+  // Estimate generated → now charge. Only an HTTP 200 from billing counts as charged.
+  const price = perCompPrice(loc);
+  const charge = await chargeWallet(loc.ghl_location_id, price, idemKey, snap.ghl_contact_id ?? undefined);
+  if (!charge.ok) {
+    usage.insert({
+      location_id: loc.id,
+      snapshot_id: snap.id,
+      type: 'repairs',
+      bricked_status: 200,
+      bricked_cost: settings.brickedCost(),
+      charged_amount: 0,
+      charge_status: 'charge_failed',
+      free_reason: charge.reason,
+      address: property.subject.address,
+      idempotency_key: null, // no charge occurred — retry allowed after resolve
+    });
+    return { ok: false, status: 402, charged: false, chargeStatus: 'charge_failed', billingIssue: true, fallback: { kind: 'billing_issue', message: 'Insufficient wallet balance — please top up to generate an estimate.', reason: charge.reason } };
   }
 
   // merge repairs into the existing snapshot (same version — repairs enrich it)
