@@ -76,7 +76,11 @@ export async function fetchLocationName(ghlLocationId: string): Promise<string |
     const res = await fetch(url, { method: 'GET', headers: authHeaders() });
     if (res.status !== 200) return null; // 404/4xx → not a known/authorized location
     const body: any = await res.json().catch(() => ({}));
-    const name = body?.name ?? body?.location?.name ?? body?.locationName ?? body?.data?.name;
+    const b = Array.isArray(body) ? body[0] ?? {} : body ?? {};
+    // Tolerate the various keys the location webhook might use (n8n returns
+    // `locationname`); GHL/other layouts use name / locationName / location.name.
+    const name =
+      b.locationname ?? b.location_name ?? b.locationName ?? b.name ?? b.location?.name ?? b.data?.name ?? b.data?.locationname;
     return typeof name === 'string' && name.trim() ? name.trim() : null;
   } catch {
     return undefined; // network/transient → don't lock the user out
