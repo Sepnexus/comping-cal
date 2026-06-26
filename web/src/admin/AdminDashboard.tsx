@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminApi, adminToken } from '../lib/api';
-import { money, moneyK, initials } from '../lib/format';
+import { money2, initials } from '../lib/format';
 
 interface Dashboard {
   kpis: {
@@ -56,9 +56,9 @@ export function AdminDashboard() {
       color: 'var(--text)',
     },
     { label: 'Comps today', value: k ? k.compsToday.toLocaleString() : '—', delta: 'today', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Margin (30d)', value: k ? money(k.margin) : '—', delta: 'net revenue', deltaColor: 'var(--brand)', color: 'var(--brand)' },
+    { label: 'Margin (30d)', value: k ? money2(k.margin) : '—', delta: 'net revenue', deltaColor: 'var(--brand)', color: 'var(--brand)' },
     { label: 'Failed charges', value: k ? String(k.failedCharges) : '—', delta: 'wallet declines', deltaColor: 'var(--red)', color: 'var(--red)' },
-    { label: 'API spend (30d)', value: k ? money(k.brickedSpend) : '—', delta: 'API cost', deltaColor: 'var(--text2)', color: 'var(--text)' },
+    { label: 'API spend (30d)', value: k ? money2(k.brickedSpend) : '—', delta: 'API cost', deltaColor: 'var(--text2)', color: 'var(--text)' },
   ];
 
   const series = data?.series ?? [];
@@ -213,7 +213,7 @@ export function AdminDashboard() {
               </div>
               <span style={{ flex: 1, fontWeight: 600 }}>{a.name}</span>
               <span style={{ fontFamily: 'Geist Mono', color: 'var(--text2)', width: 90, textAlign: 'right' }}>{a.hits.toLocaleString()} comps</span>
-              <span style={{ fontFamily: 'Geist Mono', fontWeight: 600, width: 80, textAlign: 'right', color: 'var(--brand)' }}>+{moneyK(a.margin)}</span>
+              <span style={{ fontFamily: 'Geist Mono', fontWeight: 600, width: 90, textAlign: 'right', color: 'var(--brand)' }}>+{money2(a.margin)}</span>
             </div>
           ))
         )}

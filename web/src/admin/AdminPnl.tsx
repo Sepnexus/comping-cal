@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminApi, adminToken } from '../lib/api';
-import { money } from '../lib/format';
+import { money2 } from '../lib/format';
 
 interface PnlRow {
   month: string;
@@ -58,12 +58,12 @@ export function AdminPnl() {
   const totalFees = rows.reduce((s, r) => s + r.fees, 0);
 
   const kpis = [
-    { label: 'Revenue (30d)', value: t ? money(t.rev) : '—', delta: 'collected', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Comp API cost', value: t ? money(t.cost) : '—', delta: 'COGS', deltaColor: 'var(--text2)', color: 'var(--text)' },
-    { label: 'Gross profit', value: t ? money(grossProfit) : '—', delta: 'rev − cost', deltaColor: 'var(--brand)', color: 'var(--brand)' },
+    { label: 'Revenue (30d)', value: t ? money2(t.rev) : '—', delta: 'collected', deltaColor: 'var(--brand)', color: 'var(--text)' },
+    { label: 'Comp API cost', value: t ? money2(t.cost) : '—', delta: 'COGS', deltaColor: 'var(--text2)', color: 'var(--text)' },
+    { label: 'Gross profit', value: t ? money2(grossProfit) : '—', delta: 'rev − cost', deltaColor: 'var(--brand)', color: 'var(--brand)' },
     { label: 'Gross margin', value: t ? `${grossMargin.toFixed(1)}%` : '—', delta: 'Target 65%', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Net profit', value: t ? money(t.profit) : '—', delta: 'after fees', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Proc. fees', value: money(totalFees), delta: t && t.rev ? `${((totalFees / t.rev) * 100).toFixed(1)}% of rev` : '—', deltaColor: 'var(--amber)', color: 'var(--text)' },
+    { label: 'Net profit', value: t ? money2(t.profit) : '—', delta: 'after fees', deltaColor: 'var(--brand)', color: 'var(--text)' },
+    { label: 'Proc. fees', value: money2(totalFees), delta: t && t.rev ? `${((totalFees / t.rev) * 100).toFixed(1)}% of rev` : '—', deltaColor: 'var(--amber)', color: 'var(--text)' },
   ];
 
   const maxRev = Math.max(1, ...rows.map((r) => r.revenue));
@@ -123,7 +123,7 @@ export function AdminPnl() {
                 .reverse()
                 .map((b, i) => (
                   <div key={b.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', justifyContent: 'end' }}>
-                    <span style={{ fontFamily: 'Geist Mono', fontSize: 10, color: 'var(--brand)', fontWeight: 600 }}>${(b.profit / 1000).toFixed(1)}k</span>
+                    <span style={{ fontFamily: 'Geist Mono', fontSize: 10, color: 'var(--brand)', fontWeight: 600 }}>{money2(b.profit)}</span>
                     <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'end', height: '100%' }}>
                       <div style={{ flex: 1, height: `${(b.revenue / maxRev) * 100}%`, background: 'var(--brand)', borderRadius: '3px 3px 0 0', transformOrigin: 'bottom', animation: 'barGrow .7s cubic-bezier(.2,.8,.2,1) both', animationDelay: `${(i * 0.05).toFixed(2)}s` }} />
                       <div style={{ flex: 1, height: `${(b.brickedCost / maxRev) * 100}%`, background: 'var(--red)', borderRadius: '3px 3px 0 0', transformOrigin: 'bottom', animation: 'barGrow .7s cubic-bezier(.2,.8,.2,1) both', animationDelay: `${(i * 0.05).toFixed(2)}s` }} />
@@ -152,13 +152,13 @@ export function AdminPnl() {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'Geist Mono' }}>
-                        {money(a.rev)} rev · {money(a.cost)} cost
+                        {money2(a.rev)} rev · {money2(a.cost)} cost
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontFamily: 'Geist Mono', fontWeight: 600, color: profitColor }}>
                         {profit < 0 ? '−' : '+'}
-                        {money(Math.abs(profit))}
+                        {money2(Math.abs(profit))}
                       </div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'Geist Mono' }}>{margin.toFixed(1)}%</div>
                     </div>
@@ -199,10 +199,10 @@ export function AdminPnl() {
               rows.map((r) => (
                 <tr key={r.month} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '12px 18px', fontWeight: 600 }}>{new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono' }}>{money(r.revenue)}</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--red)' }}>{money(r.brickedCost)}</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--text2)' }}>{money(r.fees)}</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', fontWeight: 600, color: 'var(--brand)' }}>{money(r.profit)}</td>
+                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono' }}>{money2(r.revenue)}</td>
+                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--red)' }}>{money2(r.brickedCost)}</td>
+                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--text2)' }}>{money2(r.fees)}</td>
+                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', fontWeight: 600, color: 'var(--brand)' }}>{money2(r.profit)}</td>
                   <td style={{ padding: '12px 18px', textAlign: 'right', fontFamily: 'Geist Mono' }}>{r.margin.toFixed(1)}%</td>
                 </tr>
               ))

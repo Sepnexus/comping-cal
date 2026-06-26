@@ -3,6 +3,12 @@ export function money(n: number | null | undefined, opts: { dash?: boolean } = {
   return '$' + Math.round(n).toLocaleString('en-US');
 }
 
+/** Precise money with cents — for billing/P&L where sub-dollar amounts matter. */
+export function money2(n: number | null | undefined, opts: { dash?: boolean } = {}): string {
+  if (n == null || !Number.isFinite(n)) return opts.dash ? '—' : '$0.00';
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /** Compact money like $363K / $1.2M for cards. */
 export function moneyK(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
