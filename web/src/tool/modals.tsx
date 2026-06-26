@@ -24,7 +24,15 @@ const overlay: React.CSSProperties = {
   padding: 24,
 };
 
-// ── Offer calculator (strategy modal) ────────────────────────────────────────
+const STRAT_DESC: Record<string, string> = {
+  wholesale: 'Cash exit. Max offer after repairs, holding, closing and your assignment fee.',
+  flip: 'Buy, rehab, resell. Covers all costs and your target profit on resale.',
+  novation: 'Retail exit on an agreement. Max offer after commission and resale costs.',
+  rental: 'Buy-and-hold priced back from a target equity cushion at purchase.',
+  subjectto: 'Take over the seller’s existing mortgage; value from monthly cash flow.',
+};
+
+// ── Offer calculator (strategy picker → calculator) ──────────────────────────
 export function StrategyModal({
   open,
   base,
@@ -38,17 +46,22 @@ export function StrategyModal({
   onSave: (offer: SavedOffer) => void;
   onClose: () => void;
 }) {
+  const [view, setView] = useState<'pick' | 'calc'>('pick');
   const [stratId, setStratId] = useState(STRATEGIES[0].id);
   const [vals, setVals] = useState<Record<string, number>>({});
-  const [switching, setSwitching] = useState(false);
 
-  // Seed from the saved offer (edit) or defaults (fresh) whenever the modal opens.
+  // On open: if a strategy is already selected (saved offer), go straight to its
+  // calculator; otherwise show the picker so the user chooses a strategy first.
   useEffect(() => {
     if (!open) return;
-    const def = (initial && strategyById(initial.strategy)) || STRATEGIES[0];
-    setStratId(def.id);
-    setVals(initial && strategyById(initial.strategy) ? { ...defaultValues(def, base), ...initial.inputs } : defaultValues(def, base));
-    setSwitching(false);
+    const saved = initial && strategyById(initial.strategy);
+    if (saved) {
+      setStratId(saved.id);
+      setVals({ ...defaultValues(saved, base), ...initial!.inputs });
+      setView('calc');
+    } else {
+      setView('pick');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -61,13 +74,46 @@ export function StrategyModal({
     const d = strategyById(id)!;
     setStratId(id);
     setVals(defaultValues(d, base));
-    setSwitching(false);
+    setView('calc');
   };
 
   const autoRows = [
     { label: def.valueLabel, value: money(base.arv) },
     { label: 'Repairs', value: money(base.repairs) },
   ];
+
+  // ── Strategy picker: shown first, before any calculator ──
+  if (view === 'pick') {
+    return (
+      <Portal>
+        <div style={{ ...overlay, zIndex: 88 }} onClick={onClose}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 640, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, boxShadow: 'var(--shadow-lg)', animation: 'scaleIn .26s ease both', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 700, letterSpacing: '-.3px' }}>Choose a strategy</h3>
+            <p style={{ margin: '0 0 16px', color: 'var(--text2)', fontSize: 13 }}>Pick how you want to underwrite this deal. All offer math runs on the saved comp — always free.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
+              {STRATEGIES.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => pickStrategy(s.id)}
+                  className="strategy-card"
+                  style={{ textAlign: 'left', border: `1px solid ${s.id === initial?.strategy ? 'var(--brand)' : 'var(--border2)'}`, background: s.id === initial?.strategy ? 'var(--brand-soft)' : 'var(--surface2)', borderRadius: 13, padding: '14px 15px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 5 }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{s.label}</span>
+                    <Icon path={ic.chevR} size={15} stroke="var(--muted)" width={2} />
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.4 }}>{STRAT_DESC[s.id] ?? ''}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+              <button onClick={onClose} style={{ height: 40, padding: '0 20px', borderRadius: 999, border: '1px solid var(--border2)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      </Portal>
+    );
+  }
 
   return (
     <Portal>
@@ -78,24 +124,11 @@ export function StrategyModal({
         >
           {/* header */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '22px 24px 0' }}>
-            <div style={{ position: 'relative' }}>
+            <div>
               <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.3px' }}>{def.label}</h3>
-              <button onClick={() => setSwitching((s) => !s)} style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+              <button onClick={() => setView('pick')} style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
                 <Icon path={ic.refresh} size={13} stroke="var(--muted)" width={2} /> Switch strategy
               </button>
-              {switching && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, minWidth: 230, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-lg)', zIndex: 5, padding: 6 }}>
-                  {STRATEGIES.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => pickStrategy(s.id)}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', background: s.id === stratId ? 'var(--brand-soft)' : 'transparent', color: s.id === stratId ? 'var(--brand)' : 'var(--text)' }}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 600 }}>Offer Price</div>
