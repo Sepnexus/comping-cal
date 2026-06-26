@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { adminApi, adminToken } from '../lib/api';
 import { money2, initials } from '../lib/format';
 
+interface RecentEvent {
+  time: string;
+  location: string;
+  address: string | null;
+  type: string;
+  chargeStatus: string;
+  chargedAmount: number;
+  brickedStatus: number | null;
+}
+
 interface Dashboard {
   kpis: {
     totalLocations: number;
@@ -12,10 +22,15 @@ interface Dashboard {
     failedCharges: number;
     brickedSpend: number;
     revenue: number;
+    totalComps: number;
+    avgPerComp: number;
+    freeViews: number;
+    snapshotCount: number;
   };
   errorRate: { status: number; c: number }[];
   topLocations: { name: string; hits: number; margin: number }[];
   series: { d: string; rev: number; spend: number }[];
+  recent: RecentEvent[];
 }
 
 const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1180, margin: '0 auto', padding: '26px 28px 50px' };
@@ -47,24 +62,34 @@ export function AdminDashboard() {
 
   const k = data?.kpis;
   const kpiCards = [
-    { label: 'Total locations', value: k ? k.totalLocations.toLocaleString() : '—', delta: 'on allowlist', deltaColor: 'var(--brand)', color: 'var(--text)' },
+    { label: 'Revenue', value: k ? money2(k.revenue) : '—', delta: 'collected', deltaColor: 'var(--brand)', color: 'var(--brand)' },
+    { label: 'Profit / margin', value: k ? money2(k.margin) : '—', delta: k && k.revenue ? `${((k.margin / k.revenue) * 100).toFixed(0)}% margin` : 'rev − API cost', deltaColor: 'var(--brand)', color: 'var(--brand)' },
+    { label: 'API spend', value: k ? money2(k.brickedSpend) : '—', delta: 'comp API cost', deltaColor: 'var(--text2)', color: 'var(--text)' },
+    { label: 'Comps run', value: k ? k.totalComps.toLocaleString() : '—', delta: k ? `${k.compsToday} today` : '—', deltaColor: 'var(--brand)', color: 'var(--text)' },
     {
       label: 'Active locations',
       value: k ? k.activeLocations.toLocaleString() : '—',
-      delta: k && k.totalLocations ? `${Math.round((k.activeLocations / k.totalLocations) * 100)}% of base` : '—',
+      delta: k ? `${k.activeLocations} of ${k.totalLocations}` : '—',
       deltaColor: 'var(--brand)',
       color: 'var(--text)',
     },
-    { label: 'Comps today', value: k ? k.compsToday.toLocaleString() : '—', delta: 'today', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Margin (30d)', value: k ? money2(k.margin) : '—', delta: 'net revenue', deltaColor: 'var(--brand)', color: 'var(--brand)' },
-    { label: 'Failed charges', value: k ? String(k.failedCharges) : '—', delta: 'wallet declines', deltaColor: 'var(--red)', color: 'var(--red)' },
-    { label: 'API spend (30d)', value: k ? money2(k.brickedSpend) : '—', delta: 'API cost', deltaColor: 'var(--text2)', color: 'var(--text)' },
+    { label: 'Failed charges', value: k ? String(k.failedCharges) : '—', delta: 'wallet declines', deltaColor: k && k.failedCharges ? 'var(--red)' : 'var(--text2)', color: k && k.failedCharges ? 'var(--red)' : 'var(--text)' },
+  ];
+
+  const miniStats = [
+    { label: 'Avg / comp', value: k ? money2(k.avgPerComp) : '—' },
+    { label: 'Free opens (cached)', value: k ? k.freeViews.toLocaleString() : '—' },
+    { label: 'Snapshots stored', value: k ? k.snapshotCount.toLocaleString() : '—' },
   ];
 
   const series = data?.series ?? [];
   const maxSeries = Math.max(1, ...series.map((s) => Math.max(s.rev, s.spend)));
   const errors = data?.errorRate ?? [];
   const maxErr = Math.max(1, ...errors.map((e) => e.c));
+  const recent = data?.recent ?? [];
+  const timeShort = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  const outcomeStyle = (s: string): [string, string] =>
+    s === 'charged' ? ['var(--brand)', 'var(--brand-soft)'] : s === 'charge_failed' ? ['var(--red)', 'var(--red-soft)'] : ['var(--text2)', 'var(--surface3)'];
 
   return (
     <div style={page}>
@@ -100,6 +125,16 @@ export function AdminDashboard() {
               <div style={{ fontFamily: 'Geist Mono', fontWeight: 600, fontSize: 23, letterSpacing: '-.5px', marginTop: 8, color: c.color }}>{c.value}</div>
             )}
             <div style={{ fontSize: 11.5, color: c.deltaColor, marginTop: 3, fontWeight: 600 }}>{c.delta}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mini stats strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+        {miniStats.map((s) => (
+          <div key={s.label} style={{ ...cardBase, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>{s.label}</span>
+            <span style={{ fontFamily: 'Geist Mono', fontWeight: 600, fontSize: 15 }}>{loading ? '—' : s.value}</span>
           </div>
         ))}
       </div>
@@ -196,6 +231,7 @@ export function AdminDashboard() {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
       {/* Top locations */}
       <div style={{ ...cardBase, overflow: 'hidden' }}>
         <div style={{ padding: '15px 18px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>Top locations by usage</div>
@@ -217,6 +253,32 @@ export function AdminDashboard() {
             </div>
           ))
         )}
+      </div>
+
+      {/* Recent activity */}
+      <div style={{ ...cardBase, overflow: 'hidden' }}>
+        <div style={{ padding: '15px 18px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>Recent activity</div>
+        {loading ? (
+          <div style={{ padding: 18 }}><div className="sk" style={{ height: 80, width: '100%' }} /></div>
+        ) : recent.length === 0 ? (
+          <div style={{ padding: 18, color: 'var(--muted)', fontSize: 13 }}>No activity yet.</div>
+        ) : (
+          recent.map((e, i) => {
+            const [c, bg] = outcomeStyle(e.chargeStatus);
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 18px', borderBottom: '1px solid var(--border)', fontSize: 12.5 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.address || '—'}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'Geist Mono', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.location} · {timeShort(e.time)}</div>
+                </div>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text2)', background: 'var(--surface3)', padding: '2px 6px', borderRadius: 5, textTransform: 'uppercase', flexShrink: 0 }}>{e.type}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: c, background: bg, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{e.chargeStatus === 'charge_failed' ? 'failed' : e.chargeStatus}</span>
+                <span style={{ fontFamily: 'Geist Mono', fontWeight: 600, width: 48, textAlign: 'right', flexShrink: 0 }}>{e.chargedAmount > 0 ? money2(e.chargedAmount) : '—'}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
       </div>
     </div>
   );

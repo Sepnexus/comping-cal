@@ -54,9 +54,12 @@ adminRouter.get('/dashboard', requireAdmin, (_req, res) => {
   const totalLocations = (db.prepare('SELECT COUNT(*) c FROM location').get() as any).c;
   const activeLocations = (db.prepare("SELECT COUNT(*) c FROM location WHERE status='active'").get() as any).c;
   const compsToday = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charged' AND substr(created_at,1,10)=?").get(today) as any).c;
-  const agg = db.prepare("SELECT COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) cost FROM usage_event WHERE charge_status='charged'").get() as any;
+  const agg = db.prepare("SELECT COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) cost, COUNT(*) comps FROM usage_event WHERE charge_status='charged'").get() as any;
   const failedCharges = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charge_failed'").get() as any).c;
+  const freeViews = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='free'").get() as any).c;
+  const snapshotCount = (db.prepare('SELECT COUNT(*) c FROM property_snapshot').get() as any).c;
   const margin = agg.rev - agg.cost;
+  const avgPerComp = agg.comps > 0 ? agg.rev / agg.comps : 0;
 
   // error rate by bricked status
   const errRows = db
@@ -80,12 +83,23 @@ adminRouter.get('/dashboard', requireAdmin, (_req, res) => {
     )
     .all() as { d: string; rev: number; spend: number }[];
 
+  // recent activity — last comps/refresh/repairs across all locations
+  const recent = db
+    .prepare(
+      `SELECT ue.created_at time, l.name location, ue.address, ue.type, ue.charge_status chargeStatus,
+              ue.charged_amount chargedAmount, ue.bricked_status brickedStatus
+       FROM usage_event ue JOIN location l ON l.id=ue.location_id
+       ORDER BY ue.created_at DESC LIMIT 8`,
+    )
+    .all() as any[];
+
   res.json({
     ok: true,
-    kpis: { totalLocations, activeLocations, compsToday, margin, failedCharges, brickedSpend: agg.cost, revenue: agg.rev },
+    kpis: { totalLocations, activeLocations, compsToday, margin, failedCharges, brickedSpend: agg.cost, revenue: agg.rev, totalComps: agg.comps, avgPerComp, freeViews, snapshotCount },
     errorRate: errRows,
     topLocations: top,
     series: series.reverse(),
+    recent,
   });
 });
 
@@ -205,10 +219,9 @@ adminRouter.get('/pnl', requireAdmin, (_req, res) => {
     )
     .all() as { month: string; rev: number; cost: number }[];
   const rows = byMonth.map((m) => {
-    const fees = +(m.rev * 0.049).toFixed(2); // GHL wallet fees ~4.9%
-    const profit = +(m.rev - m.cost - fees).toFixed(2);
+    const profit = +(m.rev - m.cost).toFixed(2); // profit = revenue − comp API cost
     const margin = m.rev > 0 ? (profit / m.rev) * 100 : 0;
-    return { month: m.month, revenue: m.rev, brickedCost: m.cost, fees, profit, margin };
+    return { month: m.month, revenue: m.rev, brickedCost: m.cost, profit, margin };
   });
   const totals = rows.reduce(
     (a, r) => ({ rev: a.rev + r.revenue, cost: a.cost + r.brickedCost, profit: a.profit + r.profit }),

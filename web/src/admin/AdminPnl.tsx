@@ -7,7 +7,6 @@ interface PnlRow {
   month: string;
   revenue: number;
   brickedCost: number;
-  fees: number;
   profit: number;
   margin: number;
 }
@@ -53,17 +52,14 @@ export function AdminPnl() {
 
   const t = data?.totals;
   const rows = data?.rows ?? [];
-  const grossProfit = t ? t.rev - t.cost : 0;
-  const grossMargin = t && t.rev ? (grossProfit / t.rev) * 100 : 0;
-  const totalFees = rows.reduce((s, r) => s + r.fees, 0);
+  const profit = t ? t.rev - t.cost : 0;
+  const margin = t && t.rev ? (profit / t.rev) * 100 : 0;
 
   const kpis = [
-    { label: 'Revenue (30d)', value: t ? money2(t.rev) : '—', delta: 'collected', deltaColor: 'var(--brand)', color: 'var(--text)' },
+    { label: 'Revenue', value: t ? money2(t.rev) : '—', delta: 'collected', deltaColor: 'var(--brand)', color: 'var(--text)' },
     { label: 'Comp API cost', value: t ? money2(t.cost) : '—', delta: 'COGS', deltaColor: 'var(--text2)', color: 'var(--text)' },
-    { label: 'Gross profit', value: t ? money2(grossProfit) : '—', delta: 'rev − cost', deltaColor: 'var(--brand)', color: 'var(--brand)' },
-    { label: 'Gross margin', value: t ? `${grossMargin.toFixed(1)}%` : '—', delta: 'Target 65%', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Net profit', value: t ? money2(t.profit) : '—', delta: 'after fees', deltaColor: 'var(--brand)', color: 'var(--text)' },
-    { label: 'Proc. fees', value: money2(totalFees), delta: t && t.rev ? `${((totalFees / t.rev) * 100).toFixed(1)}% of rev` : '—', deltaColor: 'var(--amber)', color: 'var(--text)' },
+    { label: 'Profit', value: t ? money2(profit) : '—', delta: 'revenue − cost', deltaColor: 'var(--brand)', color: 'var(--brand)' },
+    { label: 'Margin', value: t ? `${margin.toFixed(1)}%` : '—', delta: 'profit ÷ revenue', deltaColor: 'var(--brand)', color: 'var(--text)' },
   ];
 
   const maxRev = Math.max(1, ...rows.map((r) => r.revenue));
@@ -82,7 +78,7 @@ export function AdminPnl() {
       </div>
 
       {/* KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
         {kpis.map((c, i) => (
           <div key={c.label} style={{ border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 14, padding: 15, boxShadow: 'var(--shadow)', animation: 'fadeUp .5s ease both', animationDelay: `${(i * 0.05).toFixed(2)}s` }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.4px', color: 'var(--muted)', textTransform: 'uppercase', lineHeight: 1.3, minHeight: 26 }}>{c.label}</div>
@@ -179,21 +175,20 @@ export function AdminPnl() {
               <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 700 }}>Month</th>
               <th style={{ textAlign: 'right', padding: '10px 10px', fontWeight: 700 }}>Revenue</th>
               <th style={{ textAlign: 'right', padding: '10px 10px', fontWeight: 700 }}>API cost</th>
-              <th style={{ textAlign: 'right', padding: '10px 10px', fontWeight: 700 }}>Proc. fees</th>
-              <th style={{ textAlign: 'right', padding: '10px 10px', fontWeight: 700 }}>Net profit</th>
+              <th style={{ textAlign: 'right', padding: '10px 10px', fontWeight: 700 }}>Profit</th>
               <th style={{ textAlign: 'right', padding: '10px 18px', fontWeight: 700 }}>Margin</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ padding: 18 }}>
+                <td colSpan={5} style={{ padding: 18 }}>
                   <div className="sk" style={{ height: 180, width: '100%' }} />
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 24, color: 'var(--muted)', textAlign: 'center' }}>No monthly data yet.</td>
+                <td colSpan={5} style={{ padding: 24, color: 'var(--muted)', textAlign: 'center' }}>No monthly data yet.</td>
               </tr>
             ) : (
               rows.map((r) => (
@@ -201,7 +196,6 @@ export function AdminPnl() {
                   <td style={{ padding: '12px 18px', fontWeight: 600 }}>{new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>
                   <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono' }}>{money2(r.revenue)}</td>
                   <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--red)' }}>{money2(r.brickedCost)}</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', color: 'var(--text2)' }}>{money2(r.fees)}</td>
                   <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'Geist Mono', fontWeight: 600, color: 'var(--brand)' }}>{money2(r.profit)}</td>
                   <td style={{ padding: '12px 18px', textAlign: 'right', fontFamily: 'Geist Mono' }}>{r.margin.toFixed(1)}%</td>
                 </tr>
