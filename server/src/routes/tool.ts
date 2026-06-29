@@ -237,7 +237,9 @@ toolRouter.post('/writeback', requireLocation, async (req, res) => {
     res.status(422).json({ ok: false, error: 'bad_request' });
     return;
   }
-  const allow = ['arv', 'cmv', 'repair_total', 'offer'];
+  // Whitelist keys match the GHL custom-field keys (contact.<key>) so the n8n
+  // write-back can map each to that sub-account's field id.
+  const allow = ['arv__cmv', 'rent_estimate', 'offer_price', 'repair_cost', 'comp_1_address', 'comp_2_address', 'comp_3_address'];
   const whitelisted: Record<string, number | string> = {};
   for (const k of allow) if (fields[k] != null) whitelisted[k] = fields[k];
 
