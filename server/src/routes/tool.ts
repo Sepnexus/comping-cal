@@ -5,6 +5,7 @@ import { runComp, generateRepairs, toPublicSnapshot, arvFromComps } from '../eng
 import type { BrickedProperty } from '../adapters/bricked.js';
 import { computeOffer, STRATEGIES, type StrategyId } from '../engine/offer.js';
 import { locations, snapshots, usage, writebacks } from '../db/repos.js';
+import { settings } from '../db/settings.js';
 import { normalizeAddress } from '../util/crypto.js';
 
 export const toolRouter = Router();
@@ -55,9 +56,10 @@ toolRouter.post('/session/verify', requireLocation, async (req, res) => {
   let contact = null as Awaited<ReturnType<typeof fetchContact>>;
   if (contactId) contact = await fetchContact(loc.ghl_location_id, contactId);
 
+  const perCompPrice = loc.per_comp_price ?? settings.perCompPrice();
   res.json({
     ok: true,
-    location: { id: loc.id, ghlLocationId: loc.ghl_location_id, name: loc.name, status: loc.status },
+    location: { id: loc.id, ghlLocationId: loc.ghl_location_id, name: loc.name, status: loc.status, perCompPrice },
     contact: contact ? { id: contact.id, name: contact.name, address: contact.address, notes: contact.notes ?? null } : null,
   });
 });

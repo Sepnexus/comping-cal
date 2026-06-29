@@ -179,6 +179,7 @@ export function ConfirmScreen({
   address,
   subject,
   recent,
+  price,
   onAddressChange,
   onComp,
   onOpenRecent,
@@ -187,6 +188,7 @@ export function ConfirmScreen({
   address: string;
   subject: SessionInfo['contact'];
   recent: HistoryItem[];
+  price?: number;
   onAddressChange: (v: string) => void;
   onComp: () => void;
   onOpenRecent: (id: string) => void;
@@ -223,6 +225,11 @@ export function ConfirmScreen({
         <Icon path={ic.bolt} size={18} width={2.1} />
         Comp this property
       </button>
+      {price != null && (
+        <p style={{ margin: '10px 2px 0', textAlign: 'center', fontSize: 12.5, color: 'var(--text2)' }}>
+          You'll be charged <strong style={{ color: 'var(--text)', fontFamily: 'Geist Mono' }}>${price.toFixed(2)}</strong> for this comp. Reopening an address you've already comped is free.
+        </p>
+      )}
 
       {recent.length > 0 && (
         <>

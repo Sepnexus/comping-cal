@@ -142,7 +142,7 @@ export interface LaunchContext {
 }
 
 export interface SessionInfo {
-  location: { id: string; ghlLocationId: string; name: string; status: string };
+  location: { id: string; ghlLocationId: string; name: string; status: string; perCompPrice: number };
   contact: { id: string; name: string; address: string; notes: string | null } | null;
 }
 

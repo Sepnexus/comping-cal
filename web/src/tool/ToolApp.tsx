@@ -236,6 +236,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
             address={address}
             subject={session?.contact ?? null}
             recent={recent}
+            price={session?.location?.perCompPrice}
             onAddressChange={setAddress}
             onComp={() => runComp({ address })}
             onOpenRecent={openSnapshot}
