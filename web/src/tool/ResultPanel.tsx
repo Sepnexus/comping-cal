@@ -114,17 +114,18 @@ export function ResultPanel({
   const doWriteback = async () => {
     setWritingBack(true);
     try {
-      // Keys match the GHL custom-field keys (contact.<key>). The first three
-      // selected comps fill Comp 1/2/3 Address.
-      const sel = p.comps.filter((c) => c.selected).slice(0, 3);
+      // Keys match the GHL custom-field keys (contact.<key>). Top 3 comps fill
+      // Comp 1/2/3 Address: selected comps first, then the best remaining ones so
+      // all three slots populate even when fewer than 3 are selected.
+      const top3 = [...p.comps.filter((c) => c.selected), ...p.comps.filter((c) => !c.selected)].slice(0, 3);
       await onWriteback({
         arv__cmv: Math.round(p.arv ?? 0),
         rent_estimate: Math.round(p.rentEstimate ?? 0),
         offer_price: Math.round(offer?.price ?? 0),
         repair_cost: Math.round(p.totalRepairCost ?? 0),
-        comp_1_address: sel[0]?.address ?? '',
-        comp_2_address: sel[1]?.address ?? '',
-        comp_3_address: sel[2]?.address ?? '',
+        comp_1_address: top3[0]?.address ?? '',
+        comp_2_address: top3[1]?.address ?? '',
+        comp_3_address: top3[2]?.address ?? '',
       });
     } finally {
       setWritingBack(false);
