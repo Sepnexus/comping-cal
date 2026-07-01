@@ -177,7 +177,7 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
     async (fields: Record<string, number | string>) => {
       if (!snapshot) return;
       await toolApi.writeback({ contactId: session?.contact?.id, snapshotId: snapshot.id, fields });
-      flashToast({ kind: 'saved', msg: 'Pushed to GHL contact' });
+      flashToast({ kind: 'saved', msg: 'Pushed to CRM — see the contact’s AI Comping fields' });
     },
     [snapshot, session, flashToast],
   );

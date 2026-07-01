@@ -131,6 +131,7 @@ export interface PublicSnapshot {
   takenAt: string;
   property: BrickedProperty;
   stale: boolean;
+  pushedToCrm: boolean;
 }
 
 export interface LaunchContext {

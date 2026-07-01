@@ -4,7 +4,7 @@ import { fetchContact, writeBackContact } from '../adapters/ghl.js';
 import { runComp, generateRepairs, toPublicSnapshot, arvFromComps } from '../engine/comp.js';
 import type { BrickedProperty } from '../adapters/bricked.js';
 import { computeOffer, STRATEGIES, type StrategyId } from '../engine/offer.js';
-import { locations, snapshots, usage, writebacks } from '../db/repos.js';
+import { locations, snapshots, usage, writebacks, feedback } from '../db/repos.js';
 import { settings } from '../db/settings.js';
 import { normalizeAddress } from '../util/crypto.js';
 
@@ -114,6 +114,51 @@ toolRouter.post('/repairs', requireLocation, async (req, res) => {
     return;
   }
   res.json({ ok: true, charged: outcome.charged, snapshot: outcome.snapshot });
+});
+
+/**
+ * POST /repairs/set — set the repair cost directly (manual override). Free, no
+ * Bricked call — the value flows into ARV/offer math and write-back like any other.
+ */
+toolRouter.post('/repairs/set', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const { snapshotId, repairCost } = req.body ?? {};
+  const row = snapshotId ? snapshots.byId(String(snapshotId)) : undefined;
+  if (!row || row.location_id !== loc.id) {
+    res.status(404).json({ ok: false, error: 'not_found' });
+    return;
+  }
+  const value = Math.max(0, Math.round(Number(repairCost) || 0));
+  const property = JSON.parse(row.raw_json) as BrickedProperty;
+  property.totalRepairCost = value;
+  property.repairs = value > 0 ? [{ label: 'Manual repair estimate', cost: value }] : [];
+  const updated = snapshots.updateRepairs(row.id, JSON.stringify(property), value)!;
+  res.json({ ok: true, snapshot: toPublicSnapshot(updated) });
+});
+
+/**
+ * POST /feedback — thumbs up/down on a comp, with an optional reason on a
+ * thumbs-down. Free; stored for the admin Feedback page.
+ */
+toolRouter.post('/feedback', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const { snapshotId, rating, reason } = req.body ?? {};
+  if (rating !== 'up' && rating !== 'down') {
+    res.status(422).json({ ok: false, error: 'bad_rating' });
+    return;
+  }
+  const snap = snapshotId ? snapshots.byId(String(snapshotId)) : undefined;
+  const address = snap && snap.location_id === loc.id ? toPublicSnapshot(snap).address : null;
+  const contactName = snap && snap.location_id === loc.id ? snap.ghl_contact_name : null;
+  feedback.insert({
+    location_id: loc.id,
+    snapshot_id: snap && snap.location_id === loc.id ? snap.id : null,
+    address,
+    contact_name: contactName,
+    rating,
+    reason: reason ? String(reason).slice(0, 500) : null,
+  });
+  res.json({ ok: true });
 });
 
 /** GET /history — list snapshots for the location (free, §9). */

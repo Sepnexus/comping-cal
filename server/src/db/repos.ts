@@ -208,6 +208,45 @@ export const writebacks = {
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(uuid(), row.location_id, row.ghl_contact_id, row.snapshot_id, row.fields_written, row.status);
   },
+  hasSuccessForSnapshot(snapshotId: string): boolean {
+    const r = db.prepare("SELECT 1 FROM writeback_log WHERE snapshot_id=? AND status='success' LIMIT 1").get(snapshotId);
+    return !!r;
+  },
+};
+
+// ── feedback (thumbs up/down on a comp) ──────────────────────────────────────
+export interface FeedbackRow {
+  id: string;
+  location_id: string;
+  snapshot_id: string | null;
+  address: string | null;
+  contact_name: string | null;
+  rating: 'up' | 'down';
+  reason: string | null;
+  created_at: string;
+}
+export const feedback = {
+  insert(row: Omit<FeedbackRow, 'id' | 'created_at'>): FeedbackRow {
+    const id = uuid();
+    db.prepare(
+      `INSERT INTO feedback (id, location_id, snapshot_id, address, contact_name, rating, reason)
+       VALUES (@id, @location_id, @snapshot_id, @address, @contact_name, @rating, @reason)`,
+    ).run({ ...row, id });
+    return db.prepare('SELECT * FROM feedback WHERE id=?').get(id) as FeedbackRow;
+  },
+  recent(limit = 200): (FeedbackRow & { location_name: string })[] {
+    return db
+      .prepare(
+        `SELECT f.*, l.name location_name FROM feedback f JOIN location l ON l.id=f.location_id
+         ORDER BY f.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as any;
+  },
+  counts(): { up: number; down: number } {
+    const up = (db.prepare("SELECT COUNT(*) c FROM feedback WHERE rating='up'").get() as any).c;
+    const down = (db.prepare("SELECT COUNT(*) c FROM feedback WHERE rating='down'").get() as any).c;
+    return { up, down };
+  },
 };
 
 // ── admin users ──────────────────────────────────────────────────────────────

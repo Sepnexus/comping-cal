@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config.js';
 import { requireAdmin, signAdminToken } from '../middleware/auth.js';
-import { admins, locations, usage } from '../db/repos.js';
+import { admins, locations, usage, feedback } from '../db/repos.js';
 import { settings } from '../db/settings.js';
 import { verifyPassword, launchTokenFor } from '../util/crypto.js';
 import { db } from '../db/index.js';
@@ -206,6 +206,20 @@ adminRouter.get('/usage', requireAdmin, (_req, res) => {
     freeReason: u.free_reason,
   }));
   res.json({ ok: true, items: rows });
+});
+
+// ── Feedback (thumbs up/down from the tool) ──────────────────────────────────
+adminRouter.get('/feedback', requireAdmin, (_req, res) => {
+  const items = feedback.recent(300).map((f) => ({
+    id: f.id,
+    time: f.created_at,
+    location: f.location_name,
+    address: f.address,
+    contactName: f.contact_name,
+    rating: f.rating,
+    reason: f.reason,
+  }));
+  res.json({ ok: true, items, counts: feedback.counts() });
 });
 
 // ── Expenses / P&L (margin & spend, FRD §7.7.1 KPIs) ─────────────────────────

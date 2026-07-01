@@ -82,6 +82,18 @@ export function applySchema(db: Database.Database): void {
     value TEXT NOT NULL
   );
 
+  -- feedback — thumbs up/down on a comp, with an optional reason on a thumbs-down.
+  CREATE TABLE IF NOT EXISTS feedback (
+    id             TEXT PRIMARY KEY,
+    location_id    TEXT NOT NULL REFERENCES location(id),
+    snapshot_id    TEXT REFERENCES property_snapshot(id),
+    address        TEXT,
+    contact_name   TEXT,
+    rating         TEXT NOT NULL CHECK (rating IN ('up','down')),
+    reason         TEXT,
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  );
+
   -- 8.1.5 admin_user — for the oversight panel only (not end users).
   CREATE TABLE IF NOT EXISTS admin_user (
     id            TEXT PRIMARY KEY,

@@ -74,6 +74,39 @@ export function ResultPanel({
   const [writingBack, setWritingBack] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [pushed, setPushed] = useState(snapshot.pushedToCrm);
+  const [repairEditing, setRepairEditing] = useState(false);
+  const [repairDraft, setRepairDraft] = useState('');
+  const [fbRating, setFbRating] = useState<'up' | 'down' | null>(null);
+  const [fbReason, setFbReason] = useState('');
+  const [fbDone, setFbDone] = useState(false);
+  const [fbReasonOpen, setFbReasonOpen] = useState(false);
+
+  useEffect(() => {
+    setPushed(snapshot.pushedToCrm);
+    setFbRating(null);
+    setFbDone(false);
+    setFbReasonOpen(false);
+    setFbReason('');
+  }, [snapshot.id, snapshot.pushedToCrm]);
+
+  const saveRepairCost = async () => {
+    const value = Math.max(0, Math.round(Number(repairDraft) || 0));
+    setRepairEditing(false);
+    const res = await toolApi.setRepairCost({ snapshotId: snapshot.id, repairCost: value });
+    onSnapshot(res.snapshot);
+  };
+
+  const submitFeedback = async (rating: 'up' | 'down', reason?: string) => {
+    setFbRating(rating);
+    if (rating === 'down' && reason === undefined) {
+      setFbReasonOpen(true);
+      return;
+    }
+    await toolApi.feedback({ snapshotId: snapshot.id, rating, reason }).catch(() => {});
+    setFbReasonOpen(false);
+    setFbDone(true);
+  };
 
   // jsPDF is heavy → load it only when the user actually downloads (lazy chunk).
   const download = async () => {
@@ -127,6 +160,7 @@ export function ResultPanel({
         comp_2_address: top3[1]?.address ?? '',
         comp_3_address: top3[2]?.address ?? '',
       });
+      setPushed(true);
     } finally {
       setWritingBack(false);
     }
@@ -224,7 +258,33 @@ export function ResultPanel({
                 </button>
               )}
             </div>
-            <DealRow icon={ic.wrench} label="Repair Cost" value={money(p.totalRepairCost ? animRepair : 0)} border />
+            {/* repair cost — directly editable (free, no Bricked call) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderTop: '1px solid var(--border)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, color: 'var(--text2)' }}>
+                <Icon path={ic.wrench} size={16} stroke="var(--muted)" width={1.9} /> Repair Cost
+              </span>
+              {repairEditing ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid var(--brand)', borderRadius: 8, padding: '3px 8px', background: 'var(--surface)' }}>
+                  <span style={{ color: 'var(--muted)', fontFamily: 'Geist Mono', fontSize: 13 }}>$</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    value={repairDraft}
+                    onChange={(e) => setRepairDraft(e.target.value)}
+                    onBlur={saveRepairCost}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveRepairCost(); if (e.key === 'Escape') setRepairEditing(false); }}
+                    style={{ width: 84, border: 'none', background: 'none', color: 'var(--text)', fontFamily: 'Geist Mono', fontWeight: 600, fontSize: 15, textAlign: 'right', outline: 'none' }}
+                  />
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: 'Geist Mono', fontWeight: 600, fontSize: 15 }}>{money(p.totalRepairCost ? animRepair : 0)}</span>
+                  <button onClick={() => { setRepairDraft(String(Math.round(p.totalRepairCost ?? 0))); setRepairEditing(true); }} title="Edit repair cost" style={iconBtn}>
+                    <Icon path="M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" size={13} stroke="var(--muted)" width={2} />
+                  </button>
+                </span>
+              )}
+            </div>
           </div>
           {offer && (
             <div style={{ marginTop: 10, padding: '9px 11px', borderRadius: 10, background: 'var(--brand-soft)', color: 'var(--brand)', fontSize: 11.5 }}>
@@ -240,10 +300,56 @@ export function ResultPanel({
 
         <RepairsChat snapshot={snapshot} onRepairs={onRepairs} />
 
-        <button onClick={doWriteback} disabled={writingBack || !contact} style={{ height: 46, borderRadius: 12, border: 'none', background: 'var(--text)', color: 'var(--bg)', fontWeight: 700, fontSize: 13.5, cursor: contact ? 'pointer' : 'not-allowed', opacity: contact ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: 'var(--shadow)', animation: 'fadeUp .5s ease .2s both' }}>
-          {writingBack ? <Spinner size={16} stroke="var(--bg)" /> : <Icon path={ic.send} size={16} width={2} />}
-          {contact ? 'Push to CRM' : 'Contact unavailable'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'fadeUp .5s ease .2s both' }}>
+          <button onClick={doWriteback} disabled={writingBack || !contact} style={{ height: 46, borderRadius: 12, border: 'none', background: 'var(--text)', color: 'var(--bg)', fontWeight: 700, fontSize: 13.5, cursor: contact ? 'pointer' : 'not-allowed', opacity: contact ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: 'var(--shadow)' }}>
+            {writingBack ? <Spinner size={16} stroke="var(--bg)" /> : <Icon path={ic.send} size={16} width={2} />}
+            {!contact ? 'Contact unavailable' : pushed ? 'Update CRM' : 'Push to CRM'}
+          </button>
+
+          {pushed && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 11, background: 'var(--brand-soft)', color: 'var(--brand)', fontSize: 12 }}>
+              <Icon path="M20 6L9 17l-5-5" size={15} stroke="var(--brand)" width={2.4} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>Pushed to CRM. View the values on the contact under the <strong>AI Comping</strong> section.</span>
+            </div>
+          )}
+
+          {/* feedback */}
+          <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 13, padding: '13px 15px', boxShadow: 'var(--shadow)' }}>
+            {fbDone ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--brand)', fontWeight: 600 }}>
+                <Icon path="M20 6L9 17l-5-5" size={15} stroke="var(--brand)" width={2.4} /> Thanks — your feedback was sent.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text2)' }}>Was this comp helpful?</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => submitFeedback('up')} title="Helpful" style={thumbBtn(fbRating === 'up', 'var(--brand)')}>
+                      <Icon path="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" size={16} stroke={fbRating === 'up' ? 'var(--brand)' : 'var(--muted)'} width={1.9} />
+                    </button>
+                    <button onClick={() => submitFeedback('down')} title="Not helpful" style={thumbBtn(fbRating === 'down', 'var(--red, #c0392b)')}>
+                      <Icon path="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" size={16} stroke={fbRating === 'down' ? 'var(--red, #c0392b)' : 'var(--muted)'} width={1.9} />
+                    </button>
+                  </div>
+                </div>
+                {fbReasonOpen && (
+                  <div style={{ marginTop: 11 }}>
+                    <textarea
+                      value={fbReason}
+                      onChange={(e) => setFbReason(e.target.value)}
+                      placeholder="What was off? (optional)"
+                      rows={2}
+                      style={{ width: '100%', resize: 'vertical', border: '1px solid var(--border2)', background: 'var(--surface2)', borderRadius: 9, padding: '8px 10px', color: 'var(--text)', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                      <button onClick={() => submitFeedback('down', fbReason)} style={{ height: 32, padding: '0 16px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}>Send feedback</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <StrategyModal open={strategyOpen} base={base} initial={offer} onSave={saveOffer} onClose={() => setStrategyOpen(false)} />
@@ -279,6 +385,20 @@ const iconBtn: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
 };
+
+function thumbBtn(active: boolean, color: string): React.CSSProperties {
+  return {
+    width: 34,
+    height: 32,
+    borderRadius: 9,
+    border: `1px solid ${active ? color : 'var(--border2)'}`,
+    background: active ? 'var(--brand-soft)' : 'var(--surface2)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+}
 
 function segBtn(active: boolean): React.CSSProperties {
   return {

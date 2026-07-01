@@ -6,6 +6,7 @@ import { AdminDashboard } from './admin/AdminDashboard';
 import { AdminLocations } from './admin/AdminLocations';
 import { AdminUsageLog } from './admin/AdminUsageLog';
 import { AdminPnl } from './admin/AdminPnl';
+import { AdminFeedback } from './admin/AdminFeedback';
 import { AdminSettings } from './admin/AdminSettings';
 
 export function App() {
@@ -22,6 +23,7 @@ export function App() {
         <Route path="locations" element={<AdminLocations />} />
         <Route path="usage" element={<AdminUsageLog />} />
         <Route path="pnl" element={<AdminPnl />} />
+        <Route path="feedback" element={<AdminFeedback />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
 

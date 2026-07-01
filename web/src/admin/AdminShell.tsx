@@ -9,6 +9,7 @@ const NAV: { to: string; icon: string; label: string; end?: boolean }[] = [
   { to: '/admin/locations', icon: ic.users, label: 'Locations' },
   { to: '/admin/usage', icon: ic.list, label: 'Usage Log' },
   { to: '/admin/pnl', icon: ic.pl, label: 'Margin & Spend' },
+  { to: '/admin/feedback', icon: ic.bell, label: 'Feedback' },
   { to: '/admin/settings', icon: ic.sliders, label: 'Settings' },
 ];
 

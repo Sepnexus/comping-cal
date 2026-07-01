@@ -97,6 +97,12 @@ export const toolApi = {
   selectComps(opts: { snapshotId: string; selectedIds: string[] }): Promise<{ ok: true; snapshot: PublicSnapshot }> {
     return post('/comp/select', opts);
   },
+  setRepairCost(opts: { snapshotId: string; repairCost: number }): Promise<{ ok: true; snapshot: PublicSnapshot }> {
+    return post('/repairs/set', opts);
+  },
+  feedback(opts: { snapshotId: string; rating: 'up' | 'down'; reason?: string }): Promise<{ ok: true }> {
+    return post('/feedback', opts);
+  },
   saveOffer(opts: { snapshotId: string; offer: SavedOffer | null }): Promise<{ ok: true; snapshot: PublicSnapshot }> {
     return post('/offer/save', opts);
   },
@@ -159,6 +165,7 @@ export const adminApi = {
   pnl: () => adminGet('/pnl'),
   settings: () => adminGet('/settings'),
   updateSettings: (patch: Record<string, string | number>) => adminSend('/settings', 'PATCH', patch),
+  feedback: () => adminGet('/feedback'),
   purge: (): Promise<{ ok: true; removed: { locationsDeleted: number; snapshots: number; usageEvents: number; writebacks: number } }> =>
     adminSend('/purge', 'POST', { confirm: 'RESET' }),
 };

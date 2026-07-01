@@ -1,6 +1,6 @@
 import { bricked, type BrickedProperty, type CreatePropertyParams } from '../adapters/bricked.js';
 import { chargeWallet } from '../adapters/ghl.js';
-import { locations, snapshots, usage, type LocationRow, type SnapshotRow } from '../db/repos.js';
+import { locations, snapshots, usage, writebacks, type LocationRow, type SnapshotRow } from '../db/repos.js';
 import { settings } from '../db/settings.js';
 import { deriveIdempotencyKey, normalizeAddress } from '../util/crypto.js';
 
@@ -38,6 +38,7 @@ export interface PublicSnapshot {
   takenAt: string;
   property: BrickedProperty;
   stale: boolean;
+  pushedToCrm: boolean;
 }
 
 const STALE_AFTER_DAYS = 30;
@@ -68,6 +69,7 @@ export function toPublicSnapshot(row: SnapshotRow): PublicSnapshot {
     takenAt: row.taken_at,
     property,
     stale: ageMs > STALE_AFTER_DAYS * 86_400_000,
+    pushedToCrm: writebacks.hasSuccessForSnapshot(row.id),
   };
 }
 
