@@ -58,7 +58,7 @@ const statusMeta: Record<Status, { color: string; label: string }> = {
   suspended: { color: 'var(--red)', label: 'suspended' },
 };
 
-const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1180, margin: '0 auto', padding: '26px 28px 50px' };
+const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1680, margin: '0 auto', padding: '26px 28px 50px' };
 
 export function AdminLocations() {
   const nav = useNavigate();

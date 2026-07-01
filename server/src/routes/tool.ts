@@ -4,7 +4,7 @@ import { fetchContact, writeBackContact } from '../adapters/ghl.js';
 import { runComp, generateRepairs, toPublicSnapshot, arvFromComps } from '../engine/comp.js';
 import type { BrickedProperty } from '../adapters/bricked.js';
 import { computeOffer, STRATEGIES, type StrategyId } from '../engine/offer.js';
-import { locations, snapshots, usage, writebacks, feedback } from '../db/repos.js';
+import { locations, snapshots, usage, writebacks, feedback, tickets } from '../db/repos.js';
 import { settings } from '../db/settings.js';
 import { normalizeAddress } from '../util/crypto.js';
 
@@ -157,6 +157,29 @@ toolRouter.post('/feedback', requireLocation, (req, res) => {
     contact_name: contactName,
     rating,
     reason: reason ? String(reason).slice(0, 500) : null,
+  });
+  res.json({ ok: true });
+});
+
+/**
+ * POST /ticket — a rep raises a support ticket from the tool when a comp errored
+ * (or anything else). Free; surfaced on the admin Tickets page.
+ */
+toolRouter.post('/ticket', requireLocation, (req, res) => {
+  const loc = req.location!;
+  const { snapshotId, address, contactName, category, message } = req.body ?? {};
+  if (!message || !String(message).trim()) {
+    res.status(422).json({ ok: false, error: 'message_required' });
+    return;
+  }
+  const snap = snapshotId ? snapshots.byId(String(snapshotId)) : undefined;
+  tickets.insert({
+    location_id: loc.id,
+    snapshot_id: snap && snap.location_id === loc.id ? snap.id : null,
+    address: address ? String(address).slice(0, 240) : null,
+    contact_name: contactName ? String(contactName).slice(0, 120) : null,
+    category: category ? String(category).slice(0, 60) : 'comp_error',
+    message: String(message).slice(0, 1000),
   });
   res.json({ ok: true });
 });

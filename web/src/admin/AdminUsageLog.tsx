@@ -24,7 +24,7 @@ interface UsageRow {
   reason: string;
 }
 
-const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1240, margin: '0 auto', padding: '26px 28px 50px' };
+const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1680, margin: '0 auto', padding: '26px 28px 50px' };
 
 const typeChip: Record<UsageType, [string, string]> = {
   comp: ['var(--text2)', 'var(--surface3)'],

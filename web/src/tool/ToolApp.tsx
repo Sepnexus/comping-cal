@@ -197,6 +197,23 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
     setTimeout(() => setToast(null), 2200);
   }, []);
 
+  // Raise a support ticket from an error card — captures the address + error reason.
+  const submitTicket = useCallback(
+    async (message: string) => {
+      const name = contactName && contactName !== '…' ? contactName : undefined;
+      await toolApi
+        .createTicket({
+          address,
+          contactName: name,
+          category: fallback?.kind ?? 'comp_error',
+          message: `${message}${fallback ? ` — [${fallback.kind}] ${fallback.message ?? ''}` : ''}`,
+        })
+        .catch(() => {});
+      flashToast({ kind: 'saved', msg: 'Ticket sent to support' });
+    },
+    [address, contactName, fallback, flashToast],
+  );
+
   // History screen is its own route → opening a row navigates to the comp view,
   // preserving the launch params (locationId/token) and adding ?property=<id>.
   if (screen === 'history') {
@@ -221,7 +238,12 @@ export function ToolApp({ screen }: { screen: 'workspace' | 'history' }) {
         {ws === 'error' && (
           <ErrorCard
             fallback={fallback}
-            onRetry={(overrides) => runComp({ address, overrides })}
+            address={address}
+            onRetry={(opts) => {
+              if (opts?.address) setAddress(opts.address);
+              runComp({ address: opts?.address ?? address, overrides: opts?.overrides });
+            }}
+            onTicket={submitTicket}
           />
         )}
         {ws === 'addressMissing' && (

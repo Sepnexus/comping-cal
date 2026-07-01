@@ -269,6 +269,43 @@ export const feedback = {
   },
 };
 
+// ── support tickets ──────────────────────────────────────────────────────────
+export interface TicketRow {
+  id: string;
+  location_id: string;
+  snapshot_id: string | null;
+  address: string | null;
+  contact_name: string | null;
+  category: string | null;
+  message: string | null;
+  status: 'open' | 'resolved';
+  created_at: string;
+}
+export const tickets = {
+  insert(row: Omit<TicketRow, 'id' | 'created_at' | 'status'> & { status?: 'open' | 'resolved' }): TicketRow {
+    const id = uuid();
+    db.prepare(
+      `INSERT INTO ticket (id, location_id, snapshot_id, address, contact_name, category, message, status)
+       VALUES (@id, @location_id, @snapshot_id, @address, @contact_name, @category, @message, @status)`,
+    ).run({ ...row, id, status: row.status ?? 'open' });
+    return db.prepare('SELECT * FROM ticket WHERE id=?').get(id) as TicketRow;
+  },
+  recent(limit = 300): (TicketRow & { location_name: string })[] {
+    return db
+      .prepare(
+        `SELECT t.*, l.name location_name FROM ticket t JOIN location l ON l.id=t.location_id
+         ORDER BY (t.status='open') DESC, t.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as any;
+  },
+  setStatus(id: string, status: 'open' | 'resolved'): void {
+    db.prepare('UPDATE ticket SET status=? WHERE id=?').run(status, id);
+  },
+  openCount(): number {
+    return (db.prepare("SELECT COUNT(*) c FROM ticket WHERE status='open'").get() as any).c;
+  },
+};
+
 // ── admin users ──────────────────────────────────────────────────────────────
 export const admins = {
   byEmail(email: string): { id: string; email: string; password_hash: string; role: string } | undefined {

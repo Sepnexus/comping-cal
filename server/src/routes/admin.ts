@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config.js';
 import { requireAdmin, signAdminToken } from '../middleware/auth.js';
-import { admins, locations, usage, feedback } from '../db/repos.js';
+import { admins, locations, usage, feedback, tickets } from '../db/repos.js';
 import { settings } from '../db/settings.js';
 import { verifyPassword, launchTokenFor } from '../util/crypto.js';
 import { db } from '../db/index.js';
@@ -63,9 +63,20 @@ adminRouter.get('/dashboard', requireAdmin, (req, res) => {
 
   const agg = db.prepare("SELECT COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) cost, COUNT(*) comps FROM usage_event WHERE charge_status='charged' AND created_at >= ?").get(cutoff) as any;
   const failedCharges = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charge_failed' AND created_at >= ?").get(cutoff) as any).c;
+  const errorCount = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE (charge_status IN ('charge_failed','not_attempted') OR (bricked_status IS NOT NULL AND bricked_status >= 400)) AND created_at >= ?").get(cutoff) as any).c;
   const freeViews = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='free' AND created_at >= ?").get(cutoff) as any).c;
   const margin = agg.rev - agg.cost;
   const avgPerComp = agg.comps > 0 ? agg.rev / agg.comps : 0;
+
+  // Previous equal-length window, for window-over-window deltas (null when 'All').
+  let prevRevenue: number | null = null;
+  let prevComps: number | null = null;
+  if (rangeDays > 0) {
+    const prevCutoff = new Date(Date.now() - 2 * rangeDays * 86_400_000).toISOString();
+    const prev = db.prepare("SELECT COALESCE(SUM(charged_amount),0) rev, COUNT(*) comps FROM usage_event WHERE charge_status='charged' AND created_at >= ? AND created_at < ?").get(prevCutoff, cutoff) as any;
+    prevRevenue = prev.rev;
+    prevComps = prev.comps;
+  }
 
   // error rate by bricked status (within range)
   const errRows = db
@@ -112,7 +123,7 @@ adminRouter.get('/dashboard', requireAdmin, (req, res) => {
   res.json({
     ok: true,
     range: rangeDays,
-    kpis: { totalLocations, activeLocations, compsToday, margin, failedCharges, brickedSpend: agg.cost, revenue: agg.rev, totalComps: agg.comps, avgPerComp, freeViews, snapshotCount },
+    kpis: { totalLocations, activeLocations, compsToday, margin, failedCharges, errorCount, brickedSpend: agg.cost, revenue: agg.rev, totalComps: agg.comps, avgPerComp, freeViews, snapshotCount, prevRevenue, prevComps },
     errorRate: errRows,
     topLocations: top,
     series: series.reverse(),
@@ -268,6 +279,31 @@ adminRouter.get('/feedback', requireAdmin, (_req, res) => {
     reason: f.reason,
   }));
   res.json({ ok: true, items, counts: feedback.counts() });
+});
+
+// ── Support tickets (raised by reps from the tool) ───────────────────────────
+adminRouter.get('/tickets', requireAdmin, (_req, res) => {
+  const items = tickets.recent(300).map((t) => ({
+    id: t.id,
+    time: t.created_at,
+    location: t.location_name,
+    address: t.address,
+    contactName: t.contact_name,
+    category: t.category,
+    message: t.message,
+    status: t.status,
+  }));
+  res.json({ ok: true, items, openCount: tickets.openCount() });
+});
+
+adminRouter.patch('/tickets/:id', requireAdmin, (req, res) => {
+  const status = req.body?.status;
+  if (status !== 'open' && status !== 'resolved') {
+    res.status(422).json({ ok: false, error: 'bad_status' });
+    return;
+  }
+  tickets.setStatus(req.params.id, status);
+  res.json({ ok: true });
 });
 
 // ── Expenses / P&L (margin & spend, FRD §7.7.1 KPIs) ─────────────────────────

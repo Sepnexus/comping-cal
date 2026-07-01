@@ -13,7 +13,7 @@ interface FeedbackItem {
   reason: string | null;
 }
 
-const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1100, margin: '0 auto', padding: '26px 28px 50px' };
+const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1480, margin: '0 auto', padding: '26px 28px 50px' };
 const cardBase: React.CSSProperties = { border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 16, boxShadow: 'var(--shadow)' };
 
 const THUMB_UP = 'M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3';

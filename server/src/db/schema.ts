@@ -94,6 +94,19 @@ export function applySchema(db: Database.Database): void {
     created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   );
 
+  -- ticket — a support ticket a rep raised from the tool when a comp errored.
+  CREATE TABLE IF NOT EXISTS ticket (
+    id             TEXT PRIMARY KEY,
+    location_id    TEXT NOT NULL REFERENCES location(id),
+    snapshot_id    TEXT REFERENCES property_snapshot(id),
+    address        TEXT,
+    contact_name   TEXT,
+    category       TEXT,
+    message        TEXT,
+    status         TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved')),
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  );
+
   -- 8.1.5 admin_user — for the oversight panel only (not end users).
   CREATE TABLE IF NOT EXISTS admin_user (
     id            TEXT PRIMARY KEY,

@@ -69,56 +69,99 @@ export function BillingIssueCard({ onViewSaved, reason }: { onViewSaved: () => v
   );
 }
 
-export function ErrorCard({ fallback, onRetry }: { fallback: Fallback | null; onRetry: (overrides?: Record<string, unknown>) => void }) {
-  const needsDetails = fallback?.kind === 'missing_sqft' || fallback?.kind === 'not_found';
+export function ErrorCard({
+  fallback,
+  address,
+  onRetry,
+  onTicket,
+}: {
+  fallback: Fallback | null;
+  address: string;
+  onRetry: (opts?: { address?: string; overrides?: Record<string, unknown> }) => void;
+  onTicket: (message: string) => Promise<void> | void;
+}) {
+  const kind = fallback?.kind;
+  const badAddress = kind === 'invalid_address';
+  const needsDetails = kind === 'missing_sqft' || kind === 'not_found';
+  const [addr, setAddr] = useState(address);
   const [sqft, setSqft] = useState('');
   const [beds, setBeds] = useState('');
   const [baths, setBaths] = useState('');
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketMsg, setTicketMsg] = useState('');
+  const [ticketSent, setTicketSent] = useState(false);
+
+  const title = badAddress ? 'Check the address' : needsDetails ? 'Add a few details to comp this one' : 'Something went wrong';
+  const inputStyle: React.CSSProperties = { height: 44, border: '1.5px solid var(--border2)', background: 'var(--surface2)', borderRadius: 11, padding: '0 12px', fontSize: 14, color: 'var(--text)' };
+
+  const sendTicket = async () => {
+    if (!ticketMsg.trim()) return;
+    await onTicket(ticketMsg.trim());
+    setTicketSent(true);
+  };
 
   return (
-    <div style={{ ...card, maxWidth: 480, margin: '50px auto', padding: 34, textAlign: 'center', animation: 'scaleIn .35s ease both' }}>
-      <div style={{ width: 56, height: 56, borderRadius: 15, background: needsDetails ? 'var(--amber-soft)' : 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-        <Icon path={needsDetails ? ic.warn : ic.refresh} size={26} stroke={needsDetails ? 'var(--amber)' : 'var(--text2)'} />
+    <div style={{ ...card, maxWidth: 480, margin: '40px auto', padding: 32, textAlign: 'center', animation: 'scaleIn .35s ease both' }}>
+      <div style={{ width: 56, height: 56, borderRadius: 15, background: needsDetails || badAddress ? 'var(--amber-soft)' : 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <Icon path={needsDetails || badAddress ? ic.warn : ic.refresh} size={26} stroke={needsDetails || badAddress ? 'var(--amber)' : 'var(--text2)'} />
       </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>{needsDetails ? 'Add a few details to comp this one' : 'Temporarily unavailable'}</h2>
-      <p style={{ margin: '0 auto 20px', maxWidth: 360, color: 'var(--text2)', fontSize: 14 }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>{title}</h2>
+      <p style={{ margin: '0 auto 20px', maxWidth: 380, color: 'var(--text2)', fontSize: 14 }}>
         {fallback?.message ?? "We couldn't reach the valuation service. You weren't charged. Saved properties are still viewable."}
       </p>
-      {needsDetails ? (
-        <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            {[
-              { v: sqft, set: setSqft, ph: 'Sq Ft' },
-              { v: beds, set: setBeds, ph: 'Beds' },
-              { v: baths, set: setBaths, ph: 'Baths' },
-            ].map((f) => (
-              <input
-                key={f.ph}
-                value={f.v}
-                onChange={(e) => f.set(e.target.value)}
-                placeholder={f.ph}
-                style={{ flex: 1, height: 44, border: '1.5px solid var(--border2)', background: 'var(--surface2)', borderRadius: 11, padding: '0 12px', fontSize: 14, color: 'var(--text)', textAlign: 'center' }}
-              />
-            ))}
-          </div>
+
+      {badAddress || needsDetails ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', marginBottom: 6 }}>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text2)' }}>
+            Property address
+            <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Street, city, state ZIP" style={{ ...inputStyle, width: '100%', marginTop: 5, fontWeight: 500 }} />
+          </label>
+          {needsDetails && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[{ v: sqft, set: setSqft, ph: 'Sq Ft' }, { v: beds, set: setBeds, ph: 'Beds' }, { v: baths, set: setBaths, ph: 'Baths' }].map((f) => (
+                <input key={f.ph} value={f.v} onChange={(e) => f.set(e.target.value)} placeholder={f.ph} style={{ ...inputStyle, flex: 1, textAlign: 'center' }} />
+              ))}
+            </div>
+          )}
           <button
             onClick={() =>
               onRetry({
-                squareFeet: sqft ? Number(sqft) : undefined,
-                bedrooms: beds ? Number(beds) : undefined,
-                bathrooms: baths ? Number(baths) : undefined,
+                address: addr.trim() || undefined,
+                overrides: needsDetails ? { squareFeet: sqft ? Number(sqft) : undefined, bedrooms: beds ? Number(beds) : undefined, bathrooms: baths ? Number(baths) : undefined } : undefined,
               })
             }
-            style={{ height: 44, padding: '0 22px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+            style={{ height: 46, borderRadius: 12, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 4 }}
           >
-            Resubmit · charge only on success
+            {needsDetails ? 'Resubmit · charge only on success' : 'Retry with this address'}
           </button>
-        </>
+        </div>
       ) : (
-        <button onClick={() => onRetry()} style={{ height: 44, padding: '0 22px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+        <button onClick={() => onRetry()} style={{ height: 46, padding: '0 22px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
           Try again
         </button>
       )}
+
+      {/* Support ticket — for when retrying won't help */}
+      <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+        {ticketSent ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: 'var(--brand)', fontWeight: 600 }}>
+            <Icon path="M20 6L9 17l-5-5" size={15} stroke="var(--brand)" width={2.4} /> Ticket sent — our team will look into it.
+          </div>
+        ) : !ticketOpen ? (
+          <button onClick={() => setTicketOpen(true)} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>
+            Still stuck? Report this to support
+          </button>
+        ) : (
+          <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700 }}>Report this issue</span>
+            <textarea value={ticketMsg} onChange={(e) => setTicketMsg(e.target.value)} rows={3} placeholder="What happened? We'll include the address and the error." style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setTicketOpen(false)} style={{ height: 36, padding: '0 14px', borderRadius: 9, border: '1px solid var(--border2)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={sendTicket} disabled={!ticketMsg.trim()} style={{ height: 36, padding: '0 16px', borderRadius: 9, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontSize: 12.5, fontWeight: 700, cursor: ticketMsg.trim() ? 'pointer' : 'default', opacity: ticketMsg.trim() ? 1 : 0.6 }}>Send ticket</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

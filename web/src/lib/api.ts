@@ -103,6 +103,9 @@ export const toolApi = {
   feedback(opts: { snapshotId: string; rating: 'up' | 'down'; reason?: string }): Promise<{ ok: true }> {
     return post('/feedback', opts);
   },
+  createTicket(opts: { snapshotId?: string; address?: string; contactName?: string; category?: string; message: string }): Promise<{ ok: true }> {
+    return post('/ticket', opts);
+  },
   saveOffer(opts: { snapshotId: string; offer: SavedOffer | null }): Promise<{ ok: true; snapshot: PublicSnapshot }> {
     return post('/offer/save', opts);
   },
@@ -171,4 +174,6 @@ export const adminApi = {
   settings: () => adminGet('/settings'),
   updateSettings: (patch: Record<string, string | number>) => adminSend('/settings', 'PATCH', patch),
   feedback: () => adminGet('/feedback'),
+  tickets: () => adminGet('/tickets'),
+  updateTicket: (id: string, status: 'open' | 'resolved') => adminSend(`/tickets/${id}`, 'PATCH', { status }),
 };

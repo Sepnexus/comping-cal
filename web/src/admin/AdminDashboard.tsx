@@ -26,6 +26,9 @@ interface Dashboard {
     avgPerComp: number;
     freeViews: number;
     snapshotCount: number;
+    errorCount: number;
+    prevRevenue: number | null;
+    prevComps: number | null;
   };
   errorRate: { status: number; c: number }[];
   topLocations: { name: string; hits: number; margin: number }[];
@@ -34,7 +37,7 @@ interface Dashboard {
   recentErrors: { time: string; location: string; address: string | null; type: string; status: number | null; reason: string }[];
 }
 
-const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1180, margin: '0 auto', padding: '26px 28px 50px' };
+const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1680, margin: '0 auto', padding: '26px 28px 50px' };
 const cardBase: React.CSSProperties = { border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 16, boxShadow: 'var(--shadow)' };
 
 function statusColor(status: number): string {
@@ -71,11 +74,21 @@ export function AdminDashboard() {
   }, [nav, range]);
 
   const k = data?.kpis;
+  // window-over-window delta label (▲/▼ %), null when no previous window (All time)
+  const deltaOf = (cur: number, prev: number | null | undefined): { text: string; color: string } | null => {
+    if (prev == null) return null;
+    if (prev === 0) return cur > 0 ? { text: '▲ new', color: 'var(--brand)' } : null;
+    const pct = ((cur - prev) / prev) * 100;
+    const up = pct >= 0;
+    return { text: `${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(0)}% vs prev`, color: up ? 'var(--brand)' : 'var(--red, #c0392b)' };
+  };
+  const revDelta = k ? deltaOf(k.revenue, k.prevRevenue) : null;
+  const compsDelta = k ? deltaOf(k.totalComps, k.prevComps) : null;
   const kpiCards = [
-    { label: 'Revenue', value: k ? money2(k.revenue) : '—', delta: 'collected', deltaColor: 'var(--brand)', color: 'var(--brand)' },
+    { label: 'Revenue', value: k ? money2(k.revenue) : '—', delta: revDelta?.text ?? 'collected', deltaColor: revDelta?.color ?? 'var(--brand)', color: 'var(--brand)' },
     { label: 'Profit / margin', value: k ? money2(k.margin) : '—', delta: k && k.revenue ? `${((k.margin / k.revenue) * 100).toFixed(0)}% margin` : 'rev − API cost', deltaColor: 'var(--brand)', color: 'var(--brand)' },
     { label: 'API spend', value: k ? money2(k.brickedSpend) : '—', delta: 'comp API cost', deltaColor: 'var(--text2)', color: 'var(--text)' },
-    { label: 'Comps run', value: k ? k.totalComps.toLocaleString() : '—', delta: k ? `${k.compsToday} today` : '—', deltaColor: 'var(--brand)', color: 'var(--text)' },
+    { label: 'Comps run', value: k ? k.totalComps.toLocaleString() : '—', delta: compsDelta?.text ?? (k ? `${k.compsToday} today` : '—'), deltaColor: compsDelta?.color ?? 'var(--brand)', color: 'var(--text)' },
     {
       label: 'Active locations',
       value: k ? k.activeLocations.toLocaleString() : '—',
@@ -93,7 +106,7 @@ export function AdminDashboard() {
   ];
 
   const series = data?.series ?? [];
-  const maxSeries = Math.max(1, ...series.map((s) => Math.max(s.rev, s.spend)));
+  const maxComps = Math.max(1, ...series.map((s) => s.comps));
   const errors = data?.errorRate ?? [];
   const recent = data?.recent ?? [];
   const recentErrors = data?.recentErrors ?? [];
@@ -159,94 +172,47 @@ export function AdminDashboard() {
         ))}
       </div>
 
-      {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 16 }}>
-        <div style={{ ...cardBase, padding: '18px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>Daily comps · revenue vs API spend</span>
-            <div style={{ display: 'flex', gap: 14, fontSize: 11.5 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--brand)' }} />
-                Revenue
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: 'var(--border2)' }} />
-                Spend
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'end', gap: 9, height: 150 }}>
-            {loading ? (
-              <div className="sk" style={{ height: '100%', width: '100%' }} />
-            ) : series.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, alignSelf: 'center', margin: '0 auto' }}>No usage yet.</div>
-            ) : (
-              series.map((b, i) => {
-                const day = new Date(b.d).toLocaleDateString('en-US', { weekday: 'narrow' });
-                return (
-                  <div key={b.d + i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'end' }}>
-                    <span title={`${b.comps} comps this day`} style={{ fontSize: 10, fontFamily: 'Geist Mono', fontWeight: 700, color: 'var(--brand)' }}>{b.comps}</span>
-                    <div style={{ width: '100%', display: 'flex', gap: 3, alignItems: 'end', height: '100%' }}>
-                      <div
-                        style={{
-                          flex: 1,
-                          height: `${(b.rev / maxSeries) * 100}%`,
-                          background: 'var(--brand)',
-                          borderRadius: '3px 3px 0 0',
-                          transformOrigin: 'bottom',
-                          animation: 'barGrow .7s cubic-bezier(.2,.8,.2,1) both',
-                          animationDelay: `${(i * 0.04).toFixed(2)}s`,
-                        }}
-                      />
-                      <div
-                        style={{
-                          flex: 1,
-                          height: `${(b.spend / maxSeries) * 100}%`,
-                          background: 'var(--border2)',
-                          borderRadius: '3px 3px 0 0',
-                          transformOrigin: 'bottom',
-                          animation: 'barGrow .7s cubic-bezier(.2,.8,.2,1) both',
-                          animationDelay: `${(i * 0.04).toFixed(2)}s`,
-                        }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'Geist Mono' }}>{day}</span>
-                  </div>
-                );
-              })
-            )}
-          </div>
+      {/* Daily comps — full-width volume chart */}
+      <div style={{ ...cardBase, padding: '18px 22px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Daily comps</span>
+          <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'Geist Mono' }}>{k ? `${k.totalComps.toLocaleString()} comps · ${money2(k.revenue)} rev` : ''}</span>
         </div>
+        <div style={{ display: 'flex', alignItems: 'end', gap: 8, height: 190 }}>
+          {loading ? (
+            <div className="sk" style={{ height: '100%', width: '100%' }} />
+          ) : series.length === 0 ? (
+            <div style={{ color: 'var(--muted)', fontSize: 13, alignSelf: 'center', margin: '0 auto' }}>No comps in this window yet.</div>
+          ) : (
+            series.map((b, i) => {
+              const label = new Date(b.d).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+              return (
+                <div key={b.d + i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'end' }} title={`${b.d}: ${b.comps} comps · ${money2(b.rev)}`}>
+                  <span style={{ fontSize: 11, fontFamily: 'Geist Mono', fontWeight: 700, color: 'var(--brand)' }}>{b.comps}</span>
+                  <div style={{ width: '100%', maxWidth: 46, height: `${Math.max(4, (b.comps / maxComps) * 100)}%`, background: 'linear-gradient(var(--brand), color-mix(in srgb, var(--brand) 70%, transparent))', borderRadius: '5px 5px 0 0', transformOrigin: 'bottom', animation: 'barGrow .7s cubic-bezier(.2,.8,.2,1) both', animationDelay: `${(i * 0.04).toFixed(2)}s` }} />
+                  <span style={{ fontSize: 9.5, color: 'var(--muted)', fontFamily: 'Geist Mono' }}>{label}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
 
-        <div style={{ ...cardBase, padding: '18px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>Errors — what &amp; why</span>
-            {/* status count chips */}
+      {/* Errors — compact summary; full detail lives in the Usage Log */}
+      {!loading && (data?.kpis?.errorCount ?? 0) > 0 && (
+        <div style={{ ...cardBase, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--red, #c0392b)' }}>{data?.kpis?.errorCount} errors in this window</span>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               {errors.map((e) => (
                 <span key={e.status} style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'Geist Mono', color: statusColor(e.status), background: 'var(--surface3)', padding: '2px 7px', borderRadius: 20 }}>{e.status}·{e.c}</span>
               ))}
             </div>
+            {recentErrors[0] && <span style={{ fontSize: 12, color: 'var(--text2)' }}>latest: {recentErrors[0].reason}</span>}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 12 }}>
-            {loading ? (
-              <div className="sk" style={{ height: 120, width: '100%' }} />
-            ) : recentErrors.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 0' }}>No errors in this window. 🎉</div>
-            ) : (
-              recentErrors.map((e, i) => (
-                <div key={i} style={{ padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono', color: e.status && e.status >= 400 ? 'var(--red)' : 'var(--amber)', background: 'var(--surface3)', padding: '1px 6px', borderRadius: 5 }}>{e.status ?? 'charge'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.reason}</span>
-                  </div>
-                  <div style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'Geist Mono', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.address || '—'} · {e.location}</div>
-                </div>
-              ))
-            )}
-          </div>
+          <button onClick={() => nav('/admin/usage')} style={{ height: 32, padding: '0 13px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>View in Usage Log →</button>
         </div>
-      </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
       {/* Top locations */}
