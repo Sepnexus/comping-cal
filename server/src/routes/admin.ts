@@ -48,58 +48,76 @@ adminRouter.post('/login', (req, res) => {
 
 adminRouter.get('/me', requireAdmin, (req, res) => res.json({ ok: true, admin: req.admin }));
 
-// ── Dashboard (FRD §7.7.1) ───────────────────────────────────────────────────
-adminRouter.get('/dashboard', requireAdmin, (_req, res) => {
+// ── Dashboard (FRD §7.7.1) — with a date-range filter ────────────────────────
+adminRouter.get('/dashboard', requireAdmin, (req, res) => {
+  // range: number of days back (7 / 30 / 90), or 0 for all time. Default 30.
+  const raw = Number(req.query.range);
+  const rangeDays = [7, 30, 90].includes(raw) ? raw : raw === 0 ? 0 : 30;
+  const cutoff = rangeDays > 0 ? new Date(Date.now() - rangeDays * 86_400_000).toISOString() : '0000-01-01';
   const today = new Date().toISOString().slice(0, 10);
+
   const totalLocations = (db.prepare('SELECT COUNT(*) c FROM location').get() as any).c;
   const activeLocations = (db.prepare("SELECT COUNT(*) c FROM location WHERE status='active'").get() as any).c;
-  const compsToday = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charged' AND substr(created_at,1,10)=?").get(today) as any).c;
-  const agg = db.prepare("SELECT COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) cost, COUNT(*) comps FROM usage_event WHERE charge_status='charged'").get() as any;
-  const failedCharges = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charge_failed'").get() as any).c;
-  const freeViews = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='free'").get() as any).c;
   const snapshotCount = (db.prepare('SELECT COUNT(*) c FROM property_snapshot').get() as any).c;
+  const compsToday = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charged' AND substr(created_at,1,10)=?").get(today) as any).c;
+
+  const agg = db.prepare("SELECT COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) cost, COUNT(*) comps FROM usage_event WHERE charge_status='charged' AND created_at >= ?").get(cutoff) as any;
+  const failedCharges = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='charge_failed' AND created_at >= ?").get(cutoff) as any).c;
+  const freeViews = (db.prepare("SELECT COUNT(*) c FROM usage_event WHERE charge_status='free' AND created_at >= ?").get(cutoff) as any).c;
   const margin = agg.rev - agg.cost;
   const avgPerComp = agg.comps > 0 ? agg.rev / agg.comps : 0;
 
-  // error rate by bricked status
+  // error rate by bricked status (within range)
   const errRows = db
-    .prepare("SELECT bricked_status status, COUNT(*) c FROM usage_event WHERE bricked_status IS NOT NULL GROUP BY bricked_status ORDER BY c DESC")
-    .all() as { status: number; c: number }[];
+    .prepare("SELECT bricked_status status, COUNT(*) c FROM usage_event WHERE bricked_status IS NOT NULL AND bricked_status >= 400 AND created_at >= ? GROUP BY bricked_status ORDER BY c DESC")
+    .all(cutoff) as { status: number; c: number }[];
 
-  // top locations by charged comps
   const top = db
     .prepare(
       `SELECT l.name, COUNT(*) hits, COALESCE(SUM(ue.charged_amount-ue.bricked_cost),0) margin
        FROM usage_event ue JOIN location l ON l.id=ue.location_id
-       WHERE ue.charge_status='charged' GROUP BY l.id ORDER BY hits DESC LIMIT 5`,
+       WHERE ue.charge_status='charged' AND ue.created_at >= ? GROUP BY l.id ORDER BY hits DESC LIMIT 5`,
     )
-    .all() as { name: string; hits: number; margin: number }[];
+    .all(cutoff) as { name: string; hits: number; margin: number }[];
 
-  // last 12 days revenue vs spend
+  // daily series — comps count + revenue + spend
   const series = db
     .prepare(
-      `SELECT substr(created_at,1,10) d, COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) spend
-       FROM usage_event WHERE charge_status='charged' GROUP BY d ORDER BY d DESC LIMIT 12`,
+      `SELECT substr(created_at,1,10) d, COUNT(*) comps, COALESCE(SUM(charged_amount),0) rev, COALESCE(SUM(bricked_cost),0) spend
+       FROM usage_event WHERE charge_status='charged' AND created_at >= ? GROUP BY d ORDER BY d DESC LIMIT 14`,
     )
-    .all() as { d: string; rev: number; spend: number }[];
+    .all(cutoff) as { d: string; comps: number; rev: number; spend: number }[];
 
-  // recent activity — last comps/refresh/repairs across all locations
   const recent = db
     .prepare(
       `SELECT ue.created_at time, l.name location, ue.address, ue.type, ue.charge_status chargeStatus,
               ue.charged_amount chargedAmount, ue.bricked_status brickedStatus
        FROM usage_event ue JOIN location l ON l.id=ue.location_id
+       WHERE ue.created_at >= ? ORDER BY ue.created_at DESC LIMIT 8`,
+    )
+    .all(cutoff) as any[];
+
+  // recent ERRORS with a human reason — so admins see WHY things failed
+  const recentErrors = db
+    .prepare(
+      `SELECT ue.created_at time, l.name location, ue.address, ue.type, ue.charge_status charge_status,
+              ue.bricked_status bricked_status, ue.free_reason free_reason
+       FROM usage_event ue JOIN location l ON l.id=ue.location_id
+       WHERE ue.created_at >= ? AND (ue.charge_status IN ('charge_failed','not_attempted')
+             OR (ue.bricked_status IS NOT NULL AND ue.bricked_status >= 400))
        ORDER BY ue.created_at DESC LIMIT 8`,
     )
-    .all() as any[];
+    .all(cutoff) as any[];
 
   res.json({
     ok: true,
+    range: rangeDays,
     kpis: { totalLocations, activeLocations, compsToday, margin, failedCharges, brickedSpend: agg.cost, revenue: agg.rev, totalComps: agg.comps, avgPerComp, freeViews, snapshotCount },
     errorRate: errRows,
     topLocations: top,
     series: series.reverse(),
     recent,
+    recentErrors: recentErrors.map((e) => ({ time: e.time, location: e.location, address: e.address, type: e.type, status: e.bricked_status, reason: usageReason(e) })),
   });
 });
 
@@ -192,20 +210,50 @@ adminRouter.post('/locations', requireAdmin, (req, res) => {
   res.status(201).json({ ok: true, location: loc, ...launchLinks(loc.ghl_location_id) });
 });
 
-// ── Usage log (append-only audit, FRD §7.7.3) ────────────────────────────────
-adminRouter.get('/usage', requireAdmin, (_req, res) => {
-  const rows = usage.recent(200).map((u) => ({
-    id: u.id,
-    time: u.created_at,
-    location: u.location_name,
-    address: u.address,
-    type: u.type,
-    brickedStatus: u.bricked_status,
-    chargedAmount: u.charged_amount,
-    chargeStatus: u.charge_status,
-    freeReason: u.free_reason,
-  }));
-  res.json({ ok: true, items: rows });
+// Human-readable reason for a usage row — explains why it was charged / free /
+// failed / errored, so the log is actionable without decoding status codes.
+function usageReason(u: { charge_status: string; bricked_status: number | null; free_reason: string | null }): string {
+  if (u.charge_status === 'charged') return 'Comp delivered — charged';
+  if (u.charge_status === 'free') return u.free_reason === 'cached_view' ? 'Already comped — free reopen' : u.free_reason ?? 'Free';
+  if (u.charge_status === 'charge_failed') return u.free_reason ? `Charge declined — ${u.free_reason}` : 'Wallet charge declined';
+  // not_attempted → a Bricked error before any charge
+  switch (u.bricked_status) {
+    case 400: return 'Invalid address — Bricked couldn’t read it';
+    case 401:
+    case 402: return 'Bricked auth / subscription issue';
+    case 404: return 'No property record for this address';
+    case 412: return 'Missing details (sqft / beds) to comp';
+    case 500: return 'Bricked error / timeout';
+    default: return u.free_reason === 'error_no_charge' ? 'Bricked error — not charged' : u.free_reason ?? 'Not attempted';
+  }
+}
+
+// ── Usage log (append-only audit, FRD §7.7.3) — paginated + filterable ────────
+adminRouter.get('/usage', requireAdmin, (req, res) => {
+  const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+  const pageSize = Math.min(100, Math.max(5, parseInt(String(req.query.pageSize ?? '25'), 10) || 25));
+  const type = ['comp', 'refresh', 'repairs'].includes(String(req.query.type)) ? String(req.query.type) : undefined;
+  const status = ['charged', 'free', 'charge_failed', 'not_attempted'].includes(String(req.query.status)) ? String(req.query.status) : undefined;
+  const q = req.query.q ? String(req.query.q).trim() : undefined;
+  const { items, total } = usage.paged({ limit: pageSize, offset: (page - 1) * pageSize, type, status, q });
+  res.json({
+    ok: true,
+    total,
+    page,
+    pageSize,
+    items: items.map((u) => ({
+      id: u.id,
+      time: u.created_at,
+      location: u.location_name,
+      address: u.address,
+      type: u.type,
+      brickedStatus: u.bricked_status,
+      chargedAmount: u.charged_amount,
+      chargeStatus: u.charge_status,
+      freeReason: u.free_reason,
+      reason: usageReason(u),
+    })),
+  });
 });
 
 // ── Feedback (thumbs up/down from the tool) ──────────────────────────────────
@@ -285,40 +333,6 @@ function settingsPayload() {
 
 adminRouter.get('/settings', requireAdmin, (_req, res) => {
   res.json({ ok: true, settings: settingsPayload() });
-});
-
-/**
- * POST /admin/purge — danger zone. Wipe all operational data (every non-test
- * location, all snapshots, the whole usage/charge log and write-backs) while
- * keeping the Sandbox test location, admin accounts and settings/integration
- * keys. Requires { confirm: "RESET" } so it can't fire by accident.
- */
-const TEST_LOCATION_GHL_ID = 'loc_test01';
-adminRouter.post('/purge', requireAdmin, (req, res) => {
-  if (req.body?.confirm !== 'RESET') {
-    res.status(422).json({ ok: false, error: 'confirm_required', message: 'Send { confirm: "RESET" } to wipe data.' });
-    return;
-  }
-  const n = (sql: string, ...p: unknown[]) => (db.prepare(sql).get(...p) as any).c as number;
-  const before = {
-    locations: n('SELECT COUNT(*) c FROM location'),
-    snapshots: n('SELECT COUNT(*) c FROM property_snapshot'),
-    usageEvents: n('SELECT COUNT(*) c FROM usage_event'),
-    writebacks: n('SELECT COUNT(*) c FROM writeback_log'),
-  };
-  db.transaction(() => {
-    db.prepare('DELETE FROM usage_event').run();
-    db.prepare('DELETE FROM writeback_log').run();
-    db.prepare('DELETE FROM property_snapshot').run();
-    db.prepare('DELETE FROM location WHERE ghl_location_id != ?').run(TEST_LOCATION_GHL_ID);
-  })();
-  const remaining = {
-    locations: n('SELECT COUNT(*) c FROM location'),
-    snapshots: n('SELECT COUNT(*) c FROM property_snapshot'),
-    usageEvents: n('SELECT COUNT(*) c FROM usage_event'),
-  };
-  console.log(`  ⚠︎ admin purge by ${req.admin?.email}: removed ${before.locations - remaining.locations} locations, ${before.snapshots} snapshots, ${before.usageEvents} usage events`);
-  res.json({ ok: true, removed: { locationsDeleted: before.locations - remaining.locations, snapshots: before.snapshots, usageEvents: before.usageEvents, writebacks: before.writebacks }, kept: { locations: remaining.locations, settings: true, admins: true } });
 });
 
 adminRouter.patch('/settings', requireAdmin, (req, res) => {

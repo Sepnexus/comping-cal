@@ -69,6 +69,9 @@ export function AdminLocations() {
   const [detail, setDetail] = useState<{ location: LocationDetail; ledger: LedgerEntry[] } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
+  const [pageNo, setPageNo] = useState(1);
+  const pageSize = 15;
 
   function handle401(err: any) {
     if (err?.status === 401) {
@@ -156,6 +159,13 @@ export function AdminLocations() {
 
   const loc = detail?.location;
 
+  const filtered = query.trim()
+    ? items.filter((a) => `${a.name} ${a.ghlLocationId}`.toLowerCase().includes(query.trim().toLowerCase()))
+    : items;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageClamped = Math.min(pageNo, totalPages);
+  const paged = filtered.slice((pageClamped - 1) * pageSize, pageClamped * pageSize);
+
   const actions: { label: string; color: string; onClick: () => void }[] = [
     { label: 'Rename', color: 'var(--text)', onClick: promptRename },
     { label: 'Activate', color: 'var(--brand)', onClick: () => setStatus('active') },
@@ -175,26 +185,19 @@ export function AdminLocations() {
             auto-register on first launch — click a row to name and manage them.
           </p>
         </div>
-        <button
-          onClick={addLocation}
-          style={{
-            height: 40,
-            padding: '0 16px',
-            borderRadius: 11,
-            border: 'none',
-            background: 'var(--brand)',
-            color: 'var(--brand-ink)',
-            fontWeight: 700,
-            fontSize: 13.5,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <Icon path={ic.plus} size={16} width={2.2} />
-          Add location
-        </button>
+        <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <Icon path={ic.search} size={15} stroke="var(--muted)" width={2} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }} />
+            <input value={query} onChange={(e) => { setQuery(e.target.value); setPageNo(1); }} placeholder="Search name or ID…" style={{ height: 40, width: 220, border: '1px solid var(--border2)', background: 'var(--surface)', borderRadius: 11, padding: '0 12px 0 34px', color: 'var(--text)', fontSize: 13 }} />
+          </div>
+          <button
+            onClick={addLocation}
+            style={{ height: 40, padding: '0 16px', borderRadius: 11, border: 'none', background: 'var(--brand)', color: 'var(--brand-ink)', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <Icon path={ic.plus} size={16} width={2.2} />
+            Add location
+          </button>
+        </div>
       </div>
 
       <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 14, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
@@ -215,12 +218,12 @@ export function AdminLocations() {
                   <div className="sk" style={{ height: 200, width: '100%' }} />
                 </td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: 24, color: 'var(--muted)', textAlign: 'center' }}>No locations on the allowlist yet.</td>
+                <td colSpan={5} style={{ padding: 24, color: 'var(--muted)', textAlign: 'center' }}>{query ? 'No locations match your search.' : 'No locations on the allowlist yet.'}</td>
               </tr>
             ) : (
-              items.map((a, i) => {
+              paged.map((a, i) => {
                 const st = statusMeta[a.status] ?? statusMeta.inactive;
                 return (
                   <tr
@@ -256,6 +259,16 @@ export function AdminLocations() {
             )}
           </tbody>
         </table>
+        {!loading && filtered.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderTop: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text2)' }}>
+            <span>{(pageClamped - 1) * pageSize + 1}–{Math.min(filtered.length, pageClamped * pageSize)} of {filtered.length}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={() => setPageNo((p) => Math.max(1, p - 1))} disabled={pageClamped <= 1} style={locPagerBtn(pageClamped <= 1)}>Prev</button>
+              <span style={{ fontFamily: 'Geist Mono' }}>Page {pageClamped} / {totalPages}</span>
+              <button onClick={() => setPageNo((p) => Math.min(totalPages, p + 1))} disabled={pageClamped >= totalPages} style={locPagerBtn(pageClamped >= totalPages)}>Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {openId && (
@@ -437,6 +450,10 @@ function LinkRow({ value, href, onCopy }: { value: string; href?: string; onCopy
       </button>
     </div>
   );
+}
+
+function locPagerBtn(disabled: boolean): React.CSSProperties {
+  return { height: 32, padding: '0 13px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--surface)', color: disabled ? 'var(--muted)' : 'var(--text)', fontWeight: 600, fontSize: 12.5, cursor: disabled ? 'default' : 'pointer' };
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {

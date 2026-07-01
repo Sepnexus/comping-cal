@@ -44,30 +44,6 @@ export function AdminSettings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [purging, setPurging] = useState(false);
-  const [purgeMsg, setPurgeMsg] = useState<string | null>(null);
-
-  async function doPurge() {
-    const ok = window.confirm(
-      'Delete ALL locations (except the Sandbox test location), every snapshot, and the entire usage/charge log?\n\nSettings, integration keys and admin accounts are kept. This cannot be undone.',
-    );
-    if (!ok || purging) return;
-    setPurging(true);
-    setPurgeMsg(null);
-    try {
-      const r = await adminApi.purge();
-      setPurgeMsg(`Done — removed ${r.removed.locationsDeleted} locations, ${r.removed.snapshots} snapshots, ${r.removed.usageEvents} usage events. Test location kept.`);
-    } catch (err: any) {
-      if (err?.status === 401) {
-        adminToken.clear();
-        nav('/admin/login', { replace: true });
-        return;
-      }
-      setPurgeMsg(err?.body?.message ?? 'Could not reset data.');
-    } finally {
-      setPurging(false);
-    }
-  }
 
   function hydrate(r: { settings: Settings }) {
     setS(r.settings);
@@ -215,22 +191,6 @@ export function AdminSettings() {
               <PriceField label="API cost / call" prefix="$" value={form.brickedCost} onChange={(v) => set('brickedCost', v)} step="0.01" />
               <PriceField label="Global cost ceiling / location" prefix="$" suffix="/mo" value={form.globalCostCeiling} onChange={(v) => set('globalCostCeiling', v)} step="1" />
               <PriceField label="Comp lookback (months)" suffix="mo" value={form.compLookback} onChange={(v) => set('compLookback', v)} step="1" />
-            </div>
-          </div>
-
-          {/* Danger zone */}
-          <div style={{ ...cardBase, border: '1px solid var(--red, #c0392b)' }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: 'var(--red, #c0392b)' }}>Danger zone — reset data</div>
-            <Hint>Permanently deletes every location except the Sandbox test location, all property snapshots, and the entire usage/charge log. Settings, integration keys and admin accounts are kept.</Hint>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button
-                onClick={doPurge}
-                disabled={purging}
-                style={{ height: 42, padding: '0 18px', borderRadius: 11, border: '1px solid var(--red, #c0392b)', background: 'transparent', color: 'var(--red, #c0392b)', fontWeight: 700, fontSize: 13, cursor: purging ? 'default' : 'pointer', opacity: purging ? 0.6 : 1 }}
-              >
-                {purging ? 'Resetting…' : 'Reset data (keep test location)'}
-              </button>
-              {purgeMsg && <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text2)' }}>{purgeMsg}</span>}
             </div>
           </div>
 

@@ -177,6 +177,26 @@ export const usage = {
       )
       .all(limit) as (UsageEventRow & { location_name: string })[];
   },
+  /** Paginated + filtered usage for the admin log. */
+  paged(opts: { limit: number; offset: number; type?: string; status?: string; q?: string }): {
+    items: (UsageEventRow & { location_name: string })[];
+    total: number;
+  } {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (opts.type) { where.push('ue.type = ?'); params.push(opts.type); }
+    if (opts.status) { where.push('ue.charge_status = ?'); params.push(opts.status); }
+    if (opts.q) { where.push('(ue.address LIKE ? OR l.name LIKE ?)'); params.push(`%${opts.q}%`, `%${opts.q}%`); }
+    const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const total = (db.prepare(`SELECT COUNT(*) c FROM usage_event ue JOIN location l ON l.id=ue.location_id ${w}`).get(...params) as any).c as number;
+    const items = db
+      .prepare(
+        `SELECT ue.*, l.name AS location_name FROM usage_event ue JOIN location l ON l.id=ue.location_id
+         ${w} ORDER BY ue.created_at DESC LIMIT ? OFFSET ?`,
+      )
+      .all(...params, opts.limit, opts.offset) as (UsageEventRow & { location_name: string })[];
+    return { items, total };
+  },
   forLocation(locationId: string, limit = 50): UsageEventRow[] {
     return db
       .prepare('SELECT * FROM usage_event WHERE location_id = ? ORDER BY created_at DESC LIMIT ?')

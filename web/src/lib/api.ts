@@ -156,16 +156,19 @@ export const adminApi = {
       }),
     );
   },
-  dashboard: () => adminGet('/dashboard'),
+  dashboard: (range?: number) => adminGet('/dashboard' + (range != null ? `?range=${range}` : '')),
   locations: () => adminGet('/locations'),
   location: (id: string) => adminGet(`/locations/${id}`),
   updateLocation: (id: string, patch: Record<string, unknown>) => adminSend(`/locations/${id}`, 'PATCH', patch),
   createLocation: (ghlLocationId: string, name?: string) => adminSend('/locations', 'POST', { ghlLocationId, name }),
-  usage: () => adminGet('/usage'),
+  usage: (params: Record<string, string | number> = {}) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== '' && v != null) qs.set(k, String(v));
+    const s = qs.toString();
+    return adminGet('/usage' + (s ? `?${s}` : ''));
+  },
   pnl: () => adminGet('/pnl'),
   settings: () => adminGet('/settings'),
   updateSettings: (patch: Record<string, string | number>) => adminSend('/settings', 'PATCH', patch),
   feedback: () => adminGet('/feedback'),
-  purge: (): Promise<{ ok: true; removed: { locationsDeleted: number; snapshots: number; usageEvents: number; writebacks: number } }> =>
-    adminSend('/purge', 'POST', { confirm: 'RESET' }),
 };

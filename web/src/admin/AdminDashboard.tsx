@@ -29,8 +29,9 @@ interface Dashboard {
   };
   errorRate: { status: number; c: number }[];
   topLocations: { name: string; hits: number; margin: number }[];
-  series: { d: string; rev: number; spend: number }[];
+  series: { d: string; comps: number; rev: number; spend: number }[];
   recent: RecentEvent[];
+  recentErrors: { time: string; location: string; address: string | null; type: string; status: number | null; reason: string }[];
 }
 
 const page: React.CSSProperties = { animation: 'fadeUp .4s ease both', maxWidth: 1180, margin: '0 auto', padding: '26px 28px 50px' };
@@ -42,14 +43,23 @@ function statusColor(status: number): string {
   return 'var(--amber)';
 }
 
+const RANGES: { label: string; days: number }[] = [
+  { label: '7d', days: 7 },
+  { label: '30d', days: 30 },
+  { label: '90d', days: 90 },
+  { label: 'All', days: 0 },
+];
+
 export function AdminDashboard() {
   const nav = useNavigate();
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState(30);
 
   useEffect(() => {
+    setLoading(true);
     adminApi
-      .dashboard()
+      .dashboard(range)
       .then((r) => setData(r))
       .catch((err: any) => {
         if (err?.status === 401) {
@@ -58,7 +68,7 @@ export function AdminDashboard() {
         }
       })
       .finally(() => setLoading(false));
-  }, [nav]);
+  }, [nav, range]);
 
   const k = data?.kpis;
   const kpiCards = [
@@ -85,8 +95,8 @@ export function AdminDashboard() {
   const series = data?.series ?? [];
   const maxSeries = Math.max(1, ...series.map((s) => Math.max(s.rev, s.spend)));
   const errors = data?.errorRate ?? [];
-  const maxErr = Math.max(1, ...errors.map((e) => e.c));
   const recent = data?.recent ?? [];
+  const recentErrors = data?.recentErrors ?? [];
   const timeShort = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   const outcomeStyle = (s: string): [string, string] =>
     s === 'charged' ? ['var(--brand)', 'var(--brand-soft)'] : s === 'charge_failed' ? ['var(--red)', 'var(--red-soft)'] : ['var(--text2)', 'var(--surface3)'];
@@ -96,9 +106,19 @@ export function AdminDashboard() {
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ margin: '0 0 3px', fontSize: 23, fontWeight: 700, letterSpacing: '-.4px' }}>Dashboard</h1>
-          <p style={{ margin: 0, color: 'var(--text2)', fontSize: 13.5 }}>Platform health, margin and usage at a glance.</p>
+          <p style={{ margin: 0, color: 'var(--text2)', fontSize: 13.5 }}>Platform health, margin and usage — filtered to the selected window.</p>
         </div>
-        <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'Geist Mono' }}>Live · updated just now</span>
+        <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: 3, gap: 2 }}>
+          {RANGES.map((r) => (
+            <button
+              key={r.days}
+              onClick={() => setRange(r.days)}
+              style={{ padding: '6px 13px', borderRadius: 7, border: 'none', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', background: range === r.days ? 'var(--surface)' : 'transparent', color: range === r.days ? 'var(--brand)' : 'var(--text2)', boxShadow: range === r.days ? 'var(--shadow)' : 'none' }}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* KPI cards */}
@@ -165,6 +185,7 @@ export function AdminDashboard() {
                 const day = new Date(b.d).toLocaleDateString('en-US', { weekday: 'narrow' });
                 return (
                   <div key={b.d + i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'end' }}>
+                    <span title={`${b.comps} comps this day`} style={{ fontSize: 10, fontFamily: 'Geist Mono', fontWeight: 700, color: 'var(--brand)' }}>{b.comps}</span>
                     <div style={{ width: '100%', display: 'flex', gap: 3, alignItems: 'end', height: '100%' }}>
                       <div
                         style={{
@@ -198,32 +219,28 @@ export function AdminDashboard() {
         </div>
 
         <div style={{ ...cardBase, padding: '18px 20px' }}>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>Error rate by API status</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginTop: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>Errors — what &amp; why</span>
+            {/* status count chips */}
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {errors.map((e) => (
+                <span key={e.status} style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'Geist Mono', color: statusColor(e.status), background: 'var(--surface3)', padding: '2px 7px', borderRadius: 20 }}>{e.status}·{e.c}</span>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 12 }}>
             {loading ? (
-              <div className="sk" style={{ height: 100, width: '100%' }} />
-            ) : errors.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>No errors recorded.</div>
+              <div className="sk" style={{ height: 120, width: '100%' }} />
+            ) : recentErrors.length === 0 ? (
+              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 0' }}>No errors in this window. 🎉</div>
             ) : (
-              errors.map((e, i) => (
-                <div key={e.status}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-                    <span style={{ fontFamily: 'Geist Mono', color: 'var(--text2)' }}>{e.status}</span>
-                    <span style={{ fontFamily: 'Geist Mono', fontWeight: 600 }}>{e.c.toLocaleString()}</span>
+              recentErrors.map((e, i) => (
+                <div key={i} style={{ padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono', color: e.status && e.status >= 400 ? 'var(--red)' : 'var(--amber)', background: 'var(--surface3)', padding: '1px 6px', borderRadius: 5 }}>{e.status ?? 'charge'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.reason}</span>
                   </div>
-                  <div style={{ height: 7, borderRadius: 4, background: 'var(--surface3)', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${(e.c / maxErr) * 100}%`,
-                        background: statusColor(e.status),
-                        borderRadius: 4,
-                        transformOrigin: 'left',
-                        animation: 'growW .8s cubic-bezier(.2,.8,.2,1) both',
-                        animationDelay: `${(i * 0.05).toFixed(2)}s`,
-                      }}
-                    />
-                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'Geist Mono', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.address || '—'} · {e.location}</div>
                 </div>
               ))
             )}
